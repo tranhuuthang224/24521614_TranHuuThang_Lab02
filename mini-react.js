@@ -105,3 +105,94 @@ export function createElement(type, props, ...children) {
     }
   };
 }
+
+/**
+ * SVG namespace for live defense Challenge A compatibility.
+ */
+const SVG_NAMESPACE = 'http://www.w3.org/2000/svg';
+const SVG_TAGS = new Set([
+  'svg', 'path', 'circle', 'rect', 'line', 'polyline', 'polygon', 'g', 'defs', 'use'
+]);
+
+/**
+ * Recursive Mounting Engine: Transforms in-memory VNode trees into physical browser DOM elements.
+ * Adheres to strict XSS sanitization standards by generating text nodes for strings.
+ * 
+ * @param {VNode} vNode - Virtual DOM node to be rendered
+ * @returns {Node} Physical DOM Node (Element or Text)
+ * @throws {TypeError} If vNode fails the strict typeguard contract
+ */
+export function renderToDOM(vNode) {
+  // Strict Typeguard Verification
+  if (!isVNode(vNode)) {
+    throw new TypeError(
+      `[renderToDOM] Invalid VNode contract: expected a valid VNode object, got ${
+        vNode === null ? 'null' : typeof vNode
+      }`
+    );
+  }
+
+  // 1. Create text node or standard HTML/SVG element
+  let dom;
+  if (vNode.type === 'TEXT_ELEMENT') {
+    // XSS Prevention: Raw text nodes never parse innerHTML or execute scripts
+    dom = document.createTextNode(vNode.props.nodeValue ?? '');
+  } else if (typeof vNode.type === 'string') {
+    if (SVG_TAGS.has(vNode.type.toLowerCase())) {
+      dom = document.createElementNS(SVG_NAMESPACE, vNode.type);
+    } else {
+      dom = document.createElement(vNode.type);
+    }
+  } else {
+    throw new TypeError(`[renderToDOM] Unsupported VNode type: ${typeof vNode.type}`);
+  }
+
+  // 2. Assign attributes, event listeners, and DOM properties
+  Object.keys(vNode.props)
+    .filter((key) => key !== 'children' && key !== 'nodeValue')
+    .forEach((name) => {
+      const val = vNode.props[name];
+
+      if (name.startsWith('on') && typeof val === 'function') {
+        // Event listener binding (e.g. onClick -> click)
+        const eventType = name.slice(2).toLowerCase();
+        dom.addEventListener(eventType, val);
+      } else if (name === 'className') {
+        // Class attribute normalization
+        dom.className = val;
+        dom.setAttribute('class', val);
+      } else if (name === 'style' && typeof val === 'object' && val !== null) {
+        // Inline styles assignment
+        Object.assign(dom.style, val);
+      } else if (typeof val === 'boolean') {
+        // Boolean attributes (e.g., disabled, checked)
+        if (val) {
+          dom.setAttribute(name, '');
+          try { dom[name] = true; } catch (_) {}
+        } else {
+          dom.removeAttribute(name);
+          try { dom[name] = false; } catch (_) {}
+        }
+      } else if (val !== null && val !== undefined) {
+        // Standard attribute reflection
+        dom.setAttribute(name, String(val));
+        try {
+          dom[name] = val;
+        } catch (_) {
+          // Read-only DOM properties fallback to setAttribute
+        }
+      }
+    });
+
+  // Attach VNode reference to DOM node for Event Delegation and DevTools inspection
+  if (dom && dom.nodeType === 1) {
+    dom.__vnode = vNode;
+  }
+
+  // 3. Recursive traversal for children mounting
+  vNode.props.children.forEach((child) => {
+    dom.appendChild(renderToDOM(child));
+  });
+
+  return dom;
+}
