@@ -1,6 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import {
+  useState,
   resetCursor,
   setRenderer,
   getStateSnapshot,
@@ -17,4 +18,38 @@ test('Task 2.1: stateStore and resetCursor engine initialization', () => {
   resetCursor();
   assert.equal(typeof resetCursor, 'function');
   assert.equal(typeof setRenderer, 'function');
+});
+
+test('Task 2.2: reactive useState dispatcher & functional updater', () => {
+  clearStateStore();
+  let renderCount = 0;
+  setRenderer(() => { renderCount++; });
+
+  // Simulate Component Render Pass 1
+  resetCursor();
+  const [count, setCount] = useState(0);
+  const [text, setText] = useState('initial');
+
+  assert.equal(count, 0);
+  assert.equal(text, 'initial');
+  assert.equal(renderCount, 0);
+
+  // Update state with functional updater (Slide 28 Challenge B)
+  setCount((prev) => prev + 1);
+  assert.equal(renderCount, 1);
+
+  // Simulate Component Render Pass 2
+  resetCursor();
+  const [countPass2, setCountPass2] = useState(0);
+  const [textPass2, setTextPass2] = useState('initial');
+  assert.equal(countPass2, 1);
+  assert.equal(textPass2, 'initial');
+
+  // Object.is optimization: identical value does NOT trigger re-render
+  setTextPass2('initial');
+  assert.equal(renderCount, 1, 'Object.is optimization failed: re-rendered on identical value');
+
+  // Direct value setter
+  setTextPass2('updated');
+  assert.equal(renderCount, 2);
 });
