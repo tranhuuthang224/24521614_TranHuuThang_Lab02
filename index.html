@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Lab 02 - Exercise 1: Mini-React VNode & Mounting Engine</title>
+  <title>Lab 02 - Exercise 2: Reactive State Machine & Delegation Hub</title>
   <style>
     :root {
       --bg-color: #0b0f19;
@@ -15,8 +15,7 @@
       --accent-hover: #0284c7;
       --pass-color: #10b981;
       --pass-bg: rgba(16, 185, 129, 0.15);
-      --fail-color: #ef4444;
-      --fail-bg: rgba(239, 68, 68, 0.15);
+      --danger-color: #ef4444;
       --font-mono: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
       --font-sans: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
     }
@@ -47,7 +46,6 @@
       gap: 2rem;
     }
 
-    /* Page Header */
     .lab-header {
       border-bottom: 1px solid var(--card-border);
       padding-bottom: 1.5rem;
@@ -60,6 +58,7 @@
       display: flex;
       align-items: center;
       gap: 0.75rem;
+      flex-wrap: wrap;
     }
 
     .lab-header .badge {
@@ -78,7 +77,6 @@
       font-size: 0.95rem;
     }
 
-    /* Section Cards */
     .card {
       background: var(--card-bg);
       border: 1px solid var(--card-border);
@@ -97,123 +95,168 @@
       align-items: center;
     }
 
-    /* Live Mini-React Mount Area (#app) */
+    /* Mount container */
     #app {
       background: #0d1322;
       border: 2px dashed #25334d;
       border-radius: 8px;
       padding: 1.5rem;
-      min-height: 140px;
+      min-height: 200px;
     }
 
-    /* Semantic Styles produced by Mini-React VNode Tree */
-    #app main#root-view {
+    /* Reactive Task Manager Styles (Zero Div-Soup) */
+    main.app-container {
       display: flex;
       flex-direction: column;
       gap: 1.25rem;
     }
 
-    #app header.hero {
-      border-left: 4px solid var(--accent-color);
-      padding-left: 1rem;
-    }
-
-    #app header.hero h1 {
+    .task-header h2 {
       font-size: 1.5rem;
       color: #ffffff;
     }
 
-    #app header.hero p {
+    .task-header .subtitle {
       color: var(--text-muted);
-      font-family: var(--font-mono);
-      background: #1e293b;
-      padding: 0.35rem 0.65rem;
-      border-radius: 6px;
-      display: inline-block;
-      margin-top: 0.5rem;
-      border: 1px solid #334155;
+      font-size: 0.85rem;
+      margin-top: 0.25rem;
     }
 
-    #app button {
+    /* Filter Bar */
+    .filter-bar {
+      display: flex;
+      gap: 0.5rem;
+    }
+
+    .filter-btn {
+      background: #1e293b;
+      border: 1px solid #334155;
+      color: var(--text-muted);
+      padding: 0.4rem 0.9rem;
+      border-radius: 6px;
+      cursor: pointer;
+      font-weight: 600;
+      font-size: 0.85rem;
+      transition: all 0.2s;
+    }
+
+    .filter-btn:hover {
+      background: #334155;
+      color: #ffffff;
+    }
+
+    .filter-btn.active {
+      background: var(--accent-color);
+      color: #0b0f19;
+      border-color: var(--accent-color);
+    }
+
+    /* Task Input Bar */
+    .task-input-bar {
+      display: flex;
+      gap: 0.5rem;
+    }
+
+    .task-input-bar input {
+      flex: 1;
+      background: #070a12;
+      border: 1px solid #334155;
+      border-radius: 6px;
+      padding: 0.6rem 1rem;
+      color: #ffffff;
+      font-size: 0.95rem;
+      outline: none;
+    }
+
+    .task-input-bar input:focus {
+      border-color: var(--accent-color);
+    }
+
+    .primary-btn {
       background: var(--accent-color);
       color: #0b0f19;
       font-weight: 700;
-      font-size: 1rem;
       border: none;
       border-radius: 6px;
-      padding: 0.65rem 1.5rem;
+      padding: 0.6rem 1.25rem;
       cursor: pointer;
-      align-self: flex-start;
-      transition: all 0.2s ease;
+      transition: background 0.2s;
     }
 
-    #app button:hover {
+    .primary-btn:hover {
       background: var(--accent-hover);
-      transform: translateY(-1px);
     }
 
-    #app button:active {
-      transform: translateY(0);
-    }
-
-    /* Audit Results List */
-    .audit-list {
+    /* Task List */
+    .task-list {
       list-style: none;
       display: flex;
       flex-direction: column;
-      gap: 0.75rem;
+      gap: 0.5rem;
     }
 
-    .audit-item {
+    .task-item {
+      background: #161f30;
+      border: 1px solid #233149;
+      border-radius: 6px;
+      padding: 0.6rem 0.85rem;
       display: flex;
-      align-items: flex-start;
-      gap: 1rem;
-      padding: 0.85rem 1rem;
-      background: #0d1322;
-      border-radius: 8px;
-      border: 1px solid #1a2234;
+      align-items: center;
+      gap: 0.75rem;
+      transition: all 0.2s;
     }
 
-    .audit-item.pass {
-      border-left: 4px solid var(--pass-color);
+    .task-item.completed .task-title {
+      text-decoration: line-through;
+      color: var(--text-muted);
     }
 
-    .audit-item.fail {
-      border-left: 4px solid var(--fail-color);
+    .toggle-btn {
+      background: #1e293b;
+      border: 1px solid #334155;
+      color: var(--accent-color);
+      width: 28px;
+      height: 28px;
+      border-radius: 50%;
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-weight: bold;
     }
 
-    .status-badge {
-      font-size: 0.75rem;
-      font-weight: 700;
-      font-family: var(--font-mono);
-      padding: 0.2rem 0.5rem;
-      border-radius: 4px;
-      text-transform: uppercase;
-      letter-spacing: 0.05em;
-    }
-
-    .status-badge.pass {
-      background: var(--pass-bg);
-      color: var(--pass-color);
-      border: 1px solid rgba(16, 185, 129, 0.4);
-    }
-
-    .status-badge.fail {
-      background: var(--fail-bg);
-      color: var(--fail-color);
-      border: 1px solid rgba(239, 68, 68, 0.4);
-    }
-
-    .audit-item strong {
-      display: block;
+    .task-item.completed .toggle-btn {
+      background: var(--pass-color);
       color: #ffffff;
+      border-color: var(--pass-color);
+    }
+
+    .task-title {
+      flex: 1;
       font-size: 0.95rem;
     }
 
-    .audit-item p {
+    .delete-btn {
+      background: transparent;
+      border: none;
+      color: #64748b;
+      cursor: pointer;
+      font-size: 1rem;
+      padding: 0.2rem 0.5rem;
+      border-radius: 4px;
+      transition: color 0.2s;
+    }
+
+    .delete-btn:hover {
+      color: var(--danger-color);
+    }
+
+    .empty-msg {
       color: var(--text-muted);
-      font-size: 0.85rem;
-      margin-top: 0.2rem;
+      font-size: 0.9rem;
+      font-style: italic;
+      padding: 1rem 0;
+      text-align: center;
     }
 
     /* DevTools Audit Guide */
@@ -245,82 +288,52 @@
       border-radius: 4px;
       color: #e2e8f0;
     }
-
-    #event-feedback {
-      display: inline-block;
-      margin-top: 0.75rem;
-      font-size: 0.85rem;
-      padding: 0.4rem 0.8rem;
-    }
   </style>
 </head>
 <body>
   <div class="container">
-    <!-- Header -->
     <header class="lab-header">
       <h1>
-        Mini-React VNode & Mounting Engine
-        <span class="badge">Lab 02 - Exercise 1</span>
+        Reactive State Machine & Delegation Hub
+        <span class="badge">Lab 02 - Exercise 2</span>
       </h1>
       <p>
-        Architectural Implementation: <code>createElement</code>, <code>createTextElement</code>, and <code>renderToDOM</code> with zero div-soup, strict typeguard contracts, and XSS sanitization.
+        Architectural Implementation: <code>useState</code> closure dispatcher, linear <code>stateStore</code>, and centralized <strong>Root Event Delegation Hub</strong> with zero orphan listeners.
       </p>
     </header>
 
-    <!-- Live Mounted DOM Tree (Exercise 1 Target) -->
+    <!-- Mounting Target -->
     <section class="card">
       <div class="card-title">
-        <span>Live DOM Mounting Target (<code>#app</code>)</span>
-        <span id="event-feedback" class="status-badge pass" style="display: none;">Ready</span>
+        <span>Reactive Task Manager (Live Mount: <code>#app</code>)</span>
       </div>
-      <!-- Mount container specified by Lab Checkpoint -->
       <div id="app"></div>
     </section>
 
-    <!-- Verification Audit Results -->
-    <section class="card">
-      <div class="card-title">
-        <span>Checkpoint 1 Automated Verification Results</span>
-      </div>
-      <ul id="audit-results" class="audit-list">
-        <li class="audit-item">
-          <span class="status-badge">...</span>
-          <div>
-            <strong>Initializing Test Suite...</strong>
-            <p>Running in-browser verification assertions...</p>
-          </div>
-        </li>
-      </ul>
-    </section>
-
-    <!-- Chrome DevTools Inspection Guide -->
+    <!-- DevTools Audit Guide for Checkpoint 2 -->
     <section class="card devtools-guide">
       <div class="card-title">
-        <span>Live DevTools Elements Panel Audit Guide</span>
+        <span>DevTools Audit: Zero Orphan Event Listeners Verification</span>
       </div>
       <ol class="step-list">
         <li>
-          <strong>Inspect Elements Tree:</strong> Press <code>F12</code> or <code>Ctrl+Shift+I</code> to open Chrome DevTools. Expand <code>&lt;div id="app"&gt;</code> and confirm the mounted child is <code>&lt;main id="root-view" role="main"&gt;</code> without any unwanted wrapper divs.
+          <strong>Centralized Event Delegation Hub:</strong> Open Chrome DevTools (`F12`), select <code>&lt;div id="app"&gt;</code> in Elements panel $\rightarrow$ view <strong>Event Listeners</strong> tab. Confirm that <code>click</code>, <code>input</code>, <code>keydown</code> are attached to <code>#app</code>.
         </li>
         <li>
-          <strong>Zero Div-Soup Verification:</strong> Check that all nodes are semantic elements: <code>&lt;main&gt;</code>, <code>&lt;header&gt;</code>, <code>&lt;h1&gt;</code>, <code>&lt;p&gt;</code>, <code>&lt;button&gt;</code>.
+          <strong>Zero Orphan Listeners on Button Children:</strong> Select any <code>&lt;button&gt;</code> inside <code>#app</code> (e.g., <code>Add Task</code>, <code>All</code>, <code>Active</code>, or <code>Delete</code>). Confirm its <strong>Event Listeners</strong> tab is completely <strong>EMPTY</strong> (0 listeners)! All events bubble up to the root delegation hub.
         </li>
         <li>
-          <strong>XSS Resistance Checkpoint:</strong> Verify that <code>&lt;p&gt;</code> contains the raw text <code>&lt;img onerror=alert(1)&gt; Safe Text</code> as a harmless text node instead of an active <code>&lt;img&gt;</code> element.
-        </li>
-        <li>
-          <strong>VNode Memory Parity:</strong> In the DevTools Console, inspect <code>document.getElementById('root-view').__vnode</code> to view the underlying in-memory VNode POJO representation.
+          <strong>State Mutation Verification:</strong> Click <strong>Add Task</strong> or toggle filters. Verify that clicking buttons mutates state and updates UI without re-binding orphan listeners.
         </li>
       </ol>
-      <pre><code>// DevTools Console Quick Verification:
-const mainEl = document.getElementById('root-view');
-console.log('DOM node matches VNode:', mainEl.__vnode.type === 'main');
-console.log('Divs inside app:', document.querySelectorAll('#app div').length); // Expect 0
-console.log('Images inside app:', document.querySelectorAll('#app img').length); // Expect 0</code></pre>
+      <pre><code>// DevTools Console Checkpoint 2 Verification:
+const btn = document.querySelector('#app button');
+console.log('Button direct listeners:', typeof getEventListeners === 'function' ? getEventListeners(btn) : 'Inspect in Elements panel');
+console.log('Root container listeners:', typeof getEventListeners === 'function' ? getEventListeners(document.getElementById('app')) : 'Delegation active');
+console.log('Div soup check (inside #app):', document.querySelectorAll('#app div').length); // Expect 0</code></pre>
     </section>
   </div>
 
-  <!-- Run verification test suite via ES Module -->
-  <script type="module" src="./test-runner.js"></script>
+  <script type="module" src="./checkpoint2-verify.js"></script>
 </body>
 </html>

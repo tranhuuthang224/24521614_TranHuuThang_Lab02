@@ -9,6 +9,7 @@ import {
   createElement,
   renderApp
 } from './reactive-engine.js';
+import { TaskApp } from './task-app.js';
 
 test('Task 2.1: stateStore and resetCursor engine initialization', () => {
   clearStateStore();
@@ -163,4 +164,26 @@ test('Task 2.3: root event delegation and zero orphan listeners on children', ()
   assert.notEqual(updatedButton, null);
   // Still zero orphan listeners after state mutation
   assert.deepEqual(updatedButton.listeners, {}, 'Audit Failed: Orphan event listeners found after re-render!');
+});
+
+test('Task 2.4: assemble reactive todo application with dynamic filters', () => {
+  clearStateStore();
+  resetCursor();
+
+  // Test TaskApp functional composition
+  const vNode = TaskApp();
+  assert.equal(vNode.type, 'main');
+  assert.equal(vNode.props.className, 'app-container');
+
+  // Verify Zero Div-Soup in TaskApp structure
+  const hasDivs = (node) => {
+    if (!node || typeof node !== 'object') return false;
+    if (node.type === 'div') return true;
+    for (const child of node.props?.children || []) {
+      if (hasDivs(child)) return true;
+    }
+    return false;
+  };
+
+  assert.equal(hasDivs(vNode), false, 'Zero div-soup violated in TaskApp VNode tree');
 });
