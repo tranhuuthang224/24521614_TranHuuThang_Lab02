@@ -1,0 +1,20 @@
+{
+  "name": "mini-react-lab02",
+  "version": "1.0.0",
+  "description": "Mini-React Virtual DOM & Mounting Engine - Lab 02 UIT",
+  "type": "module",
+  "main": "mini-react.js",
+  "scripts": {
+    "test": "node --test test.js",
+    "start": "npx serve ."
+  },
+  "keywords": [
+    "virtual-dom",
+    "react",
+    "vnode",
+    "mounting-engine",
+    "uit"
+  ],
+  "author": "Tran Huu Thang",
+  "license": "MIT"
+}
