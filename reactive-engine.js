@@ -76,6 +76,73 @@ export function useState(initialValue) {
 }
 
 /**
+ * Event Architecture: Root Event Delegation Hub (Slide 20).
+ * Replaces thousands of individual event listeners with a single centralized listener
+ * on the root container, dispatching events via DOM bubbling and __vnode inspection.
+ * 
+ * @param {HTMLElement} rootContainer - Root container DOM element
+ */
+export function setupEventDelegation(rootContainer) {
+  if (!rootContainer) return;
+  if (rootContainer.__delegationInitialized) return;
+  rootContainer.__delegationInitialized = true;
+
+  const supportedEvents = ['click', 'input', 'keydown', 'change', 'submit'];
+
+  supportedEvents.forEach((eventType) => {
+    rootContainer.addEventListener(eventType, (nativeEvent) => {
+      let target = nativeEvent.target;
+      const handlerProp = `on${eventType.charAt(0).toUpperCase() + eventType.slice(1)}`;
+
+      // Traverse up the DOM tree from event target to rootContainer
+      while (target && target !== rootContainer) {
+        if (
+          target.__vnode &&
+          target.__vnode.props &&
+          typeof target.__vnode.props[handlerProp] === 'function'
+        ) {
+          target.__vnode.props[handlerProp](nativeEvent);
+          break;
+        }
+        target = target.parentElement;
+      }
+    });
+  });
+}
+
+/**
+ * Root Application Mounting & Reactive Lifecycle Manager (Slide 21 Checkpoint).
+ * Coordinates cursor resets, virtual DOM rendering, and root event delegation.
+ * 
+ * @param {() => VNode} Component - Functional root component
+ * @param {HTMLElement} rootContainer - DOM mounting node
+ */
+export function renderApp(Component, rootContainer) {
+  if (typeof Component !== 'function') {
+    throw new TypeError('[renderApp] Component must be a function');
+  }
+  if (!rootContainer) {
+    throw new Error('[renderApp] Root container element is required');
+  }
+
+  // 1. Attach centralized event delegation hub to root container
+  setupEventDelegation(rootContainer);
+
+  // 2. Bind reconciliation renderer to useState triggers
+  const rerender = () => {
+    resetCursor();
+    const vApp = Component();
+    const dom = renderToDOM(vApp, { delegateEvents: true });
+    rootContainer.replaceChildren(dom);
+  };
+
+  setRenderer(rerender);
+
+  // 3. Perform initial mount
+  rerender();
+}
+
+/**
  * Get internal state store snapshot (for testing and debugging).
  * @returns {any[]}
  */

@@ -122,7 +122,7 @@ const SVG_TAGS = new Set([
  * @returns {Node} Physical DOM Node (Element or Text)
  * @throws {TypeError} If vNode fails the strict typeguard contract
  */
-export function renderToDOM(vNode) {
+export function renderToDOM(vNode, options = {}) {
   // Strict Typeguard Verification
   if (!isVNode(vNode)) {
     throw new TypeError(
@@ -154,9 +154,11 @@ export function renderToDOM(vNode) {
       const val = vNode.props[name];
 
       if (name.startsWith('on') && typeof val === 'function') {
-        // Event listener binding (e.g. onClick -> click)
-        const eventType = name.slice(2).toLowerCase();
-        dom.addEventListener(eventType, val);
+        // Event listener binding: if root event delegation is enabled, skip direct DOM listener
+        if (!options.delegateEvents) {
+          const eventType = name.slice(2).toLowerCase();
+          dom.addEventListener(eventType, val);
+        }
       } else if (name === 'className') {
         // Class attribute normalization
         dom.className = val;
@@ -191,7 +193,7 @@ export function renderToDOM(vNode) {
 
   // 3. Recursive traversal for children mounting
   vNode.props.children.forEach((child) => {
-    dom.appendChild(renderToDOM(child));
+    dom.appendChild(renderToDOM(child, options));
   });
 
   return dom;
