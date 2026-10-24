@@ -1,18 +1,20 @@
 {
-  "name": "mini-react-lab02",
+  "name": "enterprise-datagrid-lab02",
   "version": "1.0.0",
-  "description": "Mini-React Virtual DOM & Mounting Engine - Lab 02 UIT",
+  "description": "Production Enterprise Data-Grid (WCAG 2.2 AA) - Lab 02 UIT",
   "type": "module",
-  "main": "mini-react.js",
+  "main": "data-grid.js",
   "scripts": {
-    "test": "node --test test.js",
+    "test": "node --test test-datagrid.js",
+    "test:all": "node --test test.js test-datagrid.js",
     "start": "npx serve ."
   },
   "keywords": [
-    "virtual-dom",
-    "react",
-    "vnode",
-    "mounting-engine",
+    "data-grid",
+    "wcag",
+    "accessibility",
+    "roving-tabindex",
+    "zero-div-soup",
     "uit"
   ],
   "author": "Tran Huu Thang",

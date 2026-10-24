@@ -1,326 +1,99 @@
 <!DOCTYPE html>
-<html lang="en">
+<html lang="en" data-theme="dark">
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Lab 02 - Exercise 1: Mini-React VNode & Mounting Engine</title>
-  <style>
-    :root {
-      --bg-color: #0b0f19;
-      --card-bg: #111827;
-      --card-border: #1f293d;
-      --text-main: #f3f4f6;
-      --text-muted: #9ca3af;
-      --accent-color: #38bdf8;
-      --accent-hover: #0284c7;
-      --pass-color: #10b981;
-      --pass-bg: rgba(16, 185, 129, 0.15);
-      --fail-color: #ef4444;
-      --fail-bg: rgba(239, 68, 68, 0.15);
-      --font-mono: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
-      --font-sans: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
-    }
-
-    * {
-      box-sizing: border-box;
-      margin: 0;
-      padding: 0;
-    }
-
-    body {
-      background-color: var(--bg-color);
-      color: var(--text-main);
-      font-family: var(--font-sans);
-      line-height: 1.6;
-      padding: 2rem 1rem;
-      min-height: 100vh;
-      display: flex;
-      flex-direction: column;
-      align-items: center;
-    }
-
-    .container {
-      width: 100%;
-      max-width: 900px;
-      display: flex;
-      flex-direction: column;
-      gap: 2rem;
-    }
-
-    /* Page Header */
-    .lab-header {
-      border-bottom: 1px solid var(--card-border);
-      padding-bottom: 1.5rem;
-    }
-
-    .lab-header h1 {
-      font-size: 1.85rem;
-      font-weight: 700;
-      color: #ffffff;
-      display: flex;
-      align-items: center;
-      gap: 0.75rem;
-    }
-
-    .lab-header .badge {
-      font-size: 0.8rem;
-      font-weight: 600;
-      background: rgba(56, 189, 248, 0.15);
-      color: var(--accent-color);
-      padding: 0.2rem 0.6rem;
-      border-radius: 9999px;
-      border: 1px solid rgba(56, 189, 248, 0.3);
-    }
-
-    .lab-header p {
-      color: var(--text-muted);
-      margin-top: 0.5rem;
-      font-size: 0.95rem;
-    }
-
-    /* Section Cards */
-    .card {
-      background: var(--card-bg);
-      border: 1px solid var(--card-border);
-      border-radius: 12px;
-      padding: 1.5rem;
-      box-shadow: 0 4px 20px rgba(0, 0, 0, 0.35);
-    }
-
-    .card-title {
-      font-size: 1.2rem;
-      font-weight: 600;
-      color: #ffffff;
-      margin-bottom: 1rem;
-      display: flex;
-      justify-content: space-between;
-      align-items: center;
-    }
-
-    /* Live Mini-React Mount Area (#app) */
-    #app {
-      background: #0d1322;
-      border: 2px dashed #25334d;
-      border-radius: 8px;
-      padding: 1.5rem;
-      min-height: 140px;
-    }
-
-    /* Semantic Styles produced by Mini-React VNode Tree */
-    #app main#root-view {
-      display: flex;
-      flex-direction: column;
-      gap: 1.25rem;
-    }
-
-    #app header.hero {
-      border-left: 4px solid var(--accent-color);
-      padding-left: 1rem;
-    }
-
-    #app header.hero h1 {
-      font-size: 1.5rem;
-      color: #ffffff;
-    }
-
-    #app header.hero p {
-      color: var(--text-muted);
-      font-family: var(--font-mono);
-      background: #1e293b;
-      padding: 0.35rem 0.65rem;
-      border-radius: 6px;
-      display: inline-block;
-      margin-top: 0.5rem;
-      border: 1px solid #334155;
-    }
-
-    #app button {
-      background: var(--accent-color);
-      color: #0b0f19;
-      font-weight: 700;
-      font-size: 1rem;
-      border: none;
-      border-radius: 6px;
-      padding: 0.65rem 1.5rem;
-      cursor: pointer;
-      align-self: flex-start;
-      transition: all 0.2s ease;
-    }
-
-    #app button:hover {
-      background: var(--accent-hover);
-      transform: translateY(-1px);
-    }
-
-    #app button:active {
-      transform: translateY(0);
-    }
-
-    /* Audit Results List */
-    .audit-list {
-      list-style: none;
-      display: flex;
-      flex-direction: column;
-      gap: 0.75rem;
-    }
-
-    .audit-item {
-      display: flex;
-      align-items: flex-start;
-      gap: 1rem;
-      padding: 0.85rem 1rem;
-      background: #0d1322;
-      border-radius: 8px;
-      border: 1px solid #1a2234;
-    }
-
-    .audit-item.pass {
-      border-left: 4px solid var(--pass-color);
-    }
-
-    .audit-item.fail {
-      border-left: 4px solid var(--fail-color);
-    }
-
-    .status-badge {
-      font-size: 0.75rem;
-      font-weight: 700;
-      font-family: var(--font-mono);
-      padding: 0.2rem 0.5rem;
-      border-radius: 4px;
-      text-transform: uppercase;
-      letter-spacing: 0.05em;
-    }
-
-    .status-badge.pass {
-      background: var(--pass-bg);
-      color: var(--pass-color);
-      border: 1px solid rgba(16, 185, 129, 0.4);
-    }
-
-    .status-badge.fail {
-      background: var(--fail-bg);
-      color: var(--fail-color);
-      border: 1px solid rgba(239, 68, 68, 0.4);
-    }
-
-    .audit-item strong {
-      display: block;
-      color: #ffffff;
-      font-size: 0.95rem;
-    }
-
-    .audit-item p {
-      color: var(--text-muted);
-      font-size: 0.85rem;
-      margin-top: 0.2rem;
-    }
-
-    /* DevTools Audit Guide */
-    .devtools-guide pre {
-      background: #070a12;
-      border: 1px solid #1f293d;
-      border-radius: 6px;
-      padding: 1rem;
-      overflow-x: auto;
-      font-family: var(--font-mono);
-      font-size: 0.85rem;
-      color: #cbd5e1;
-      margin-top: 0.5rem;
-    }
-
-    .step-list {
-      padding-left: 1.25rem;
-      display: flex;
-      flex-direction: column;
-      gap: 0.5rem;
-      font-size: 0.9rem;
-      color: var(--text-muted);
-    }
-
-    .step-list code {
-      font-family: var(--font-mono);
-      background: #1e293b;
-      padding: 0.15rem 0.4rem;
-      border-radius: 4px;
-      color: #e2e8f0;
-    }
-
-    #event-feedback {
-      display: inline-block;
-      margin-top: 0.75rem;
-      font-size: 0.85rem;
-      padding: 0.4rem 0.8rem;
-    }
-  </style>
+  <meta name="description" content="Production Enterprise Data-Grid with WCAG 2.2 Level AA compliance, 2D roving tabindex keyboard navigation, multi-column sorting, real-time filtering, and zero div-soup.">
+  <title>Enterprise Academic Registry Data-Grid | Lab 02 - HW 1 (WCAG 2.2 AA)</title>
+  <link rel="stylesheet" href="./style.css">
 </head>
 <body>
-  <div class="container">
-    <!-- Header -->
-    <header class="lab-header">
+  <main class="datagrid-app">
+    <!-- Application Header -->
+    <header class="app-header">
       <h1>
-        Mini-React VNode & Mounting Engine
-        <span class="badge">Lab 02 - Exercise 1</span>
+        Enterprise Academic Registry Data-Grid
+        <span class="wcag-pill">WCAG 2.2 Level AA</span>
       </h1>
       <p>
-        Architectural Implementation: <code>createElement</code>, <code>createTextElement</code>, and <code>renderToDOM</code> with zero div-soup, strict typeguard contracts, and XSS sanitization.
+        UIT Academic Records Management System with 2D Roving Tabindex, Real-time Filtering, Multi-column Sorting, and Zero Div-Soup.
       </p>
+      <button type="button" class="theme-toggle-btn" id="theme-toggle" aria-label="Toggle light or dark theme">
+        🌓 Switch to Light Mode
+      </button>
     </header>
 
-    <!-- Live Mounted DOM Tree (Exercise 1 Target) -->
-    <section class="card">
-      <div class="card-title">
-        <span>Live DOM Mounting Target (<code>#app</code>)</span>
-        <span id="event-feedback" class="status-badge pass" style="display: none;">Ready</span>
-      </div>
-      <!-- Mount container specified by Lab Checkpoint -->
-      <div id="app"></div>
-    </section>
+    <!-- Selection Event Toast / Announcement -->
+    <aside id="selection-notification" class="sr-only" aria-live="polite"></aside>
 
-    <!-- Verification Audit Results -->
-    <section class="card">
-      <div class="card-title">
-        <span>Checkpoint 1 Automated Verification Results</span>
-      </div>
-      <ul id="audit-results" class="audit-list">
-        <li class="audit-item">
-          <span class="status-badge">...</span>
-          <div>
-            <strong>Initializing Test Suite...</strong>
-            <p>Running in-browser verification assertions...</p>
-          </div>
-        </li>
-      </ul>
-    </section>
+    <!-- Primary Mount Target for Data-Grid (Zero Div-Soup) -->
+    <section id="grid-root" class="datagrid-root" aria-label="UIT Student Registry Grid"></section>
 
-    <!-- Chrome DevTools Inspection Guide -->
-    <section class="card devtools-guide">
-      <div class="card-title">
-        <span>Live DevTools Elements Panel Audit Guide</span>
-      </div>
-      <ol class="step-list">
+    <!-- W3C APG Grid Keyboard & Accessibility Guide -->
+    <section class="audit-guide-card" aria-labelledby="keyboard-guide-title">
+      <h2 id="keyboard-guide-title">Keyboard Navigation & Accessibility Guide (W3C APG Grid Pattern)</h2>
+      <ol>
         <li>
-          <strong>Inspect Elements Tree:</strong> Press <code>F12</code> or <code>Ctrl+Shift+I</code> to open Chrome DevTools. Expand <code>&lt;div id="app"&gt;</code> and confirm the mounted child is <code>&lt;main id="root-view" role="main"&gt;</code> without any unwanted wrapper divs.
+          <kbd>↑</kbd> <kbd>↓</kbd> <kbd>←</kbd> <kbd>→</kbd> : <strong>2D Cell Navigation</strong> — Seamlessly moves active focus between grid cells and column headers via Roving Tabindex.
         </li>
         <li>
-          <strong>Zero Div-Soup Verification:</strong> Check that all nodes are semantic elements: <code>&lt;main&gt;</code>, <code>&lt;header&gt;</code>, <code>&lt;h1&gt;</code>, <code>&lt;p&gt;</code>, <code>&lt;button&gt;</code>.
+          <kbd>Home</kbd> / <kbd>End</kbd> : <strong>Row Boundaries</strong> — Moves focus to first or last cell in active row (<kbd>Ctrl+Home</kbd> / <kbd>Ctrl+End</kbd> moves to very first or last cell in entire grid).
         </li>
         <li>
-          <strong>XSS Resistance Checkpoint:</strong> Verify that <code>&lt;p&gt;</code> contains the raw text <code>&lt;img onerror=alert(1)&gt; Safe Text</code> as a harmless text node instead of an active <code>&lt;img&gt;</code> element.
+          <kbd>PageUp</kbd> / <kbd>PageDown</kbd> : <strong>Pagination</strong> — Navigates to previous or next page of student records.
         </li>
         <li>
-          <strong>VNode Memory Parity:</strong> In the DevTools Console, inspect <code>document.getElementById('root-view').__vnode</code> to view the underlying in-memory VNode POJO representation.
+          <kbd>Space</kbd> : <strong>Toggle</strong> — Toggles row selection checkbox on data rows, or toggles sort order on column headers.
+        </li>
+        <li>
+          <kbd>Enter</kbd> : <strong>Activate</strong> — Triggers row selection and fires the <code>onRowSelect</code> callback with student payload.
+        </li>
+        <li>
+          <kbd>Tab</kbd> / <kbd>Shift+Tab</kbd> : <strong>Grid Exit</strong> — Moves focus into or out of the grid component to adjacent interactive controls without keyboard trapping.
         </li>
       </ol>
-      <pre><code>// DevTools Console Quick Verification:
-const mainEl = document.getElementById('root-view');
-console.log('DOM node matches VNode:', mainEl.__vnode.type === 'main');
-console.log('Divs inside app:', document.querySelectorAll('#app div').length); // Expect 0
-console.log('Images inside app:', document.querySelectorAll('#app img').length); // Expect 0</code></pre>
     </section>
-  </div>
 
-  <!-- Run verification test suite via ES Module -->
-  <script type="module" src="./test-runner.js"></script>
+    <!-- Footer -->
+    <footer class="app-footer" style="text-align: center; color: var(--text-muted); font-size: 0.85rem; padding: 1rem 0;">
+      <p>Lab 02: Modern React Architecture & Enterprise Components &bull; Student: <strong>Trần Hữu Thắng (24521614)</strong> &bull; UIT - University of Information Technology</p>
+    </footer>
+  </main>
+
+  <!-- Mount Application Script -->
+  <script type="module">
+    import { createDataGrid } from './data-grid.js';
+    import { STUDENT_DATA, STUDENT_COLUMNS } from './data.js';
+
+    const gridContainer = document.getElementById('grid-root');
+    const toastNotifier = document.getElementById('selection-notification');
+    const themeBtn = document.getElementById('theme-toggle');
+
+    // Theme Switcher Controller
+    themeBtn.addEventListener('click', () => {
+      const currentTheme = document.documentElement.getAttribute('data-theme') || 'dark';
+      const newTheme = currentTheme === 'dark' ? 'light' : 'dark';
+      document.documentElement.setAttribute('data-theme', newTheme);
+      themeBtn.textContent = newTheme === 'light' ? '🌙 Switch to Dark Mode' : '🌓 Switch to Light Mode';
+    });
+
+    // Mount Data Grid Instance
+    const gridInstance = createDataGrid(gridContainer, {
+      data: STUDENT_DATA,
+      columns: STUDENT_COLUMNS,
+      ariaLabel: 'UIT Student Academic Registry',
+      initialPageSize: 10,
+      onRowSelect: (student) => {
+        const msg = `Selected student: ${student.fullName} (${student.studentId}) - GPA: ${student.gpa} - Major: ${student.major}`;
+        if (toastNotifier) {
+          toastNotifier.textContent = msg;
+        }
+        console.log('[DataGrid onRowSelect]', student);
+      }
+    });
+
+    // Expose instance to global window for DevTools evaluation
+    window.__dataGrid = gridInstance;
+  </script>
 </body>
 </html>
