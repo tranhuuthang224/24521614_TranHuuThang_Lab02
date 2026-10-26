@@ -61,6 +61,7 @@ export function createDataGrid(container, props) {
     columns: props.columns,
     ariaLabel: props.ariaLabel,
     onRowSelect: props.onRowSelect,
+    sortCriteria: [], // Array of { key: string, direction: 'ascending' | 'descending' } for multi-column sorting
     sortKey: null,
     sortDirection: 'none', // 'ascending' | 'descending' | 'none'
     filterQuery: '',
@@ -98,15 +99,17 @@ export function createDataGrid(container, props) {
       });
     }
 
-    // Sort stage
-    if (state.sortKey && state.sortDirection !== 'none') {
-      const col = state.columns.find((c) => c.accessorKey === state.sortKey);
-      if (col && col.sortable) {
-        result.sort((a, b) => {
-          const valA = a[state.sortKey];
-          const valB = b[state.sortKey];
+    // Sort stage (Supports true multi-column composite sorting)
+    if (state.sortCriteria.length > 0) {
+      result.sort((a, b) => {
+        for (const crit of state.sortCriteria) {
+          const col = state.columns.find((c) => c.accessorKey === crit.key);
+          if (!col || !col.sortable) continue;
 
-          if (valA === valB) return 0;
+          const valA = a[crit.key];
+          const valB = b[crit.key];
+
+          if (valA === valB) continue;
           if (valA === null || valA === undefined) return 1;
           if (valB === null || valB === undefined) return -1;
 
@@ -117,9 +120,12 @@ export function createDataGrid(container, props) {
             cmp = String(valA).localeCompare(String(valB), undefined, { numeric: true });
           }
 
-          return state.sortDirection === 'ascending' ? cmp : -cmp;
-        });
-      }
+          if (cmp !== 0) {
+            return crit.direction === 'ascending' ? cmp : -cmp;
+          }
+        }
+        return 0;
+      });
     }
 
     return result;
@@ -295,8 +301,9 @@ export function createDataGrid(container, props) {
       th.tabIndex = (state.focusedCell.rowIndex === 0 && state.focusedCell.colIndex === colIndex) ? 0 : -1;
 
       if (col.sortable) {
-        const isCurrentSort = state.sortKey === col.accessorKey;
-        const currentSortDir = isCurrentSort ? state.sortDirection : 'none';
+        const crit = state.sortCriteria.find((c) => c.key === col.accessorKey);
+        const currentSortDir = crit ? crit.direction : 'none';
+        const sortIndex = crit ? state.sortCriteria.indexOf(crit) + 1 : 0;
         th.setAttribute('aria-sort', currentSortDir);
 
         const sortBtn = document.createElement('button');
@@ -304,9 +311,9 @@ export function createDataGrid(container, props) {
         sortBtn.className = 'sort-trigger-btn';
         sortBtn.tabIndex = -1; // Roving tabindex is on th cell
 
-        let sortText = `${col.header}, sortable column`;
-        if (currentSortDir === 'ascending') sortText += ', sorted ascending';
-        if (currentSortDir === 'descending') sortText += ', sorted descending';
+        let sortText = `${col.header}, sortable column. Shift+click to multi-sort.`;
+        if (currentSortDir === 'ascending') sortText += `, sorted ascending (priority ${sortIndex})`;
+        if (currentSortDir === 'descending') sortText += `, sorted descending (priority ${sortIndex})`;
         sortBtn.setAttribute('aria-label', sortText);
 
         const headerTitle = document.createElement('span');
@@ -316,32 +323,65 @@ export function createDataGrid(container, props) {
         const sortIcon = document.createElement('span');
         sortIcon.className = 'sort-indicator';
         sortIcon.setAttribute('aria-hidden', 'true');
-        sortIcon.textContent = currentSortDir === 'ascending' ? ' ▲' : (currentSortDir === 'descending' ? ' ▼' : ' ⇅');
+        const arrow = currentSortDir === 'ascending' ? ' ▲' : (currentSortDir === 'descending' ? ' ▼' : ' ⇅');
+        const priorityBadge = (state.sortCriteria.length > 1 && sortIndex > 0) ? ` [${sortIndex}]` : '';
+        sortIcon.textContent = `${arrow}${priorityBadge}`;
 
         sortBtn.appendChild(headerTitle);
         sortBtn.appendChild(sortIcon);
 
-        const toggleSort = () => {
-          if (state.sortKey !== col.accessorKey) {
-            state.sortKey = col.accessorKey;
-            state.sortDirection = 'ascending';
-          } else if (state.sortDirection === 'ascending') {
-            state.sortDirection = 'descending';
-          } else if (state.sortDirection === 'descending') {
+        const toggleSort = (isMulti = false) => {
+          const existingIdx = state.sortCriteria.findIndex((c) => c.key === col.accessorKey);
+
+          if (isMulti) {
+            // Shift+Click: Multi-column composite sort
+            if (existingIdx !== -1) {
+              const currentDir = state.sortCriteria[existingIdx].direction;
+              if (currentDir === 'ascending') {
+                state.sortCriteria[existingIdx].direction = 'descending';
+              } else {
+                state.sortCriteria.splice(existingIdx, 1);
+              }
+            } else {
+              state.sortCriteria.push({ key: col.accessorKey, direction: 'ascending' });
+            }
+          } else {
+            // Single click: Primary column sort
+            if (existingIdx !== -1 && state.sortCriteria.length === 1) {
+              const currentDir = state.sortCriteria[0].direction;
+              if (currentDir === 'ascending') {
+                state.sortCriteria = [{ key: col.accessorKey, direction: 'descending' }];
+              } else {
+                state.sortCriteria = [];
+              }
+            } else {
+              state.sortCriteria = [{ key: col.accessorKey, direction: 'ascending' }];
+            }
+          }
+
+          // Sync legacy sortKey & sortDirection for backward compatibility
+          if (state.sortCriteria.length > 0) {
+            state.sortKey = state.sortCriteria[0].key;
+            state.sortDirection = state.sortCriteria[0].direction;
+          } else {
             state.sortKey = null;
             state.sortDirection = 'none';
           }
+
           state.currentPage = 1;
           render();
-          announce(`Table sorted by ${col.header} ${state.sortDirection}`);
+          const sortSummary = state.sortCriteria.map((c) => `${c.key} ${c.direction}`).join(', ') || 'none';
+          announce(`Table sort updated: ${sortSummary}`);
           focusCell(0, colIndex);
         };
 
         sortBtn.addEventListener('click', (e) => {
           e.stopPropagation();
-          toggleSort();
+          toggleSort(Boolean(e.shiftKey));
         });
-        th.addEventListener('click', toggleSort);
+        th.addEventListener('click', (e) => {
+          toggleSort(Boolean(e.shiftKey));
+        });
 
         th.appendChild(sortBtn);
       } else {
@@ -475,7 +515,17 @@ export function createDataGrid(container, props) {
     pageSummary.className = 'pagination-summary';
     const startRecordNum = totalRecords === 0 ? 0 : startIndex + 1;
     const endRecordNum = Math.min(totalRecords, startIndex + state.pageSize);
-    pageSummary.innerHTML = `Showing <strong>${startRecordNum}–${endRecordNum}</strong> of <strong>${totalRecords}</strong> records (Page ${state.currentPage} of ${totalPages})`;
+    
+    // Construct DOM nodes without raw innerHTML injection (enforcing project-rules.md)
+    pageSummary.appendChild(document.createTextNode('Showing '));
+    const strongRange = document.createElement('strong');
+    strongRange.textContent = `${startRecordNum}–${endRecordNum}`;
+    pageSummary.appendChild(strongRange);
+    pageSummary.appendChild(document.createTextNode(' of '));
+    const strongTotal = document.createElement('strong');
+    strongTotal.textContent = String(totalRecords);
+    pageSummary.appendChild(strongTotal);
+    pageSummary.appendChild(document.createTextNode(` records (Page ${state.currentPage} of ${totalPages})`));
 
     const pageNav = document.createElement('nav');
     pageNav.className = 'pagination-controls';
@@ -732,9 +782,22 @@ export function createDataGrid(container, props) {
       state.currentPage = 1;
       render();
     },
-    setSort: (key, direction) => {
-      state.sortKey = key;
-      state.sortDirection = direction;
+    setSort: (key, direction, append = false) => {
+      if (!key || direction === 'none') {
+        state.sortCriteria = state.sortCriteria.filter((c) => c.key !== key);
+      } else if (append) {
+        const existingIdx = state.sortCriteria.findIndex((c) => c.key === key);
+        if (existingIdx !== -1) {
+          state.sortCriteria[existingIdx].direction = direction;
+        } else {
+          state.sortCriteria.push({ key, direction });
+        }
+      } else {
+        state.sortCriteria = [{ key, direction }];
+      }
+      state.sortKey = state.sortCriteria[0]?.key || null;
+      state.sortDirection = state.sortCriteria[0]?.direction || 'none';
+      state.currentPage = 1;
       render();
     },
     getSelectedRows: () => {

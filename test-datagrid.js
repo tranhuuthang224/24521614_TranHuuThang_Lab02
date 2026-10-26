@@ -630,3 +630,62 @@ test('W3C APG 2D Keyboard Navigation: Arrow keys, Space and Enter interaction', 
   assert.equal(selectedViaEnter.studentId, '24521614');
   assert.equal(selectedViaEnter.fullName, 'Trần Hữu Thắng');
 });
+
+test('Multi-column Composite Sorting: Sorts by primary and secondary criteria', () => {
+  mockRootContainer = new MockElement('section');
+  const grid = createDataGrid(mockRootContainer, {
+    data: TEST_DATA,
+    columns: TEST_COLUMNS,
+    ariaLabel: 'UIT Student Registry',
+    initialPageSize: 10
+  });
+
+  // Sort primarily by major (ascending), then secondarily by gpa (descending)
+  grid.setSort('major', 'ascending');
+  grid.setSort('gpa', 'descending', true); // append = true
+
+  const rows = mockRootContainer.querySelectorAll('tbody tr');
+  assert.equal(rows.length, 10);
+
+  // First group of majors should be 'Computer Networks'
+  const row0Major = rows[0].querySelector('td[data-col="3"]').textContent;
+  assert.equal(row0Major, 'Computer Networks');
+
+  // Next group is 'Computer Science', sorted by GPA descending: 3.65 (Nguyễn Văn An) before 2.85 (Bùi Gia Huy)
+  const csRows = rows.filter((r) => r.querySelector('td[data-col="3"]').textContent === 'Computer Science');
+  assert.equal(csRows.length, 2);
+  assert.equal(csRows[0].querySelector('td[data-col="4"]').textContent, '3.65');
+  assert.equal(csRows[1].querySelector('td[data-col="4"]').textContent, '2.85');
+});
+
+test('Project Rules Compliance: Zero innerHTML injection in component rendering', () => {
+  mockRootContainer = new MockElement('section');
+  
+  // Track any innerHTML assignments
+  let innerHTMLCount = 0;
+  const originalInnerHTMLDescriptor = Object.getOwnPropertyDescriptor(MockElement.prototype, 'innerHTML');
+  
+  Object.defineProperty(MockElement.prototype, 'innerHTML', {
+    set(val) {
+      innerHTMLCount++;
+      originalInnerHTMLDescriptor.set.call(this, val);
+    },
+    get() {
+      return originalInnerHTMLDescriptor.get.call(this);
+    },
+    configurable: true
+  });
+
+  try {
+    createDataGrid(mockRootContainer, {
+      data: TEST_DATA,
+      columns: TEST_COLUMNS,
+      ariaLabel: 'UIT Student Registry',
+      initialPageSize: 5
+    });
+
+    assert.equal(innerHTMLCount, 0, 'Violation of project-rules.md: Raw innerHTML injection detected!');
+  } finally {
+    Object.defineProperty(MockElement.prototype, 'innerHTML', originalInnerHTMLDescriptor);
+  }
+});
