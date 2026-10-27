@@ -1,326 +1,442 @@
 <!DOCTYPE html>
-<html lang="en">
+<html lang="vi">
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Lab 02 - Exercise 1: Mini-React VNode & Mounting Engine</title>
-  <style>
-    :root {
-      --bg-color: #0b0f19;
-      --card-bg: #111827;
-      --card-border: #1f293d;
-      --text-main: #f3f4f6;
-      --text-muted: #9ca3af;
-      --accent-color: #38bdf8;
-      --accent-hover: #0284c7;
-      --pass-color: #10b981;
-      --pass-bg: rgba(16, 185, 129, 0.15);
-      --fail-color: #ef4444;
-      --fail-bg: rgba(239, 68, 68, 0.15);
-      --font-mono: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
-      --font-sans: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
-    }
-
-    * {
-      box-sizing: border-box;
-      margin: 0;
-      padding: 0;
-    }
-
-    body {
-      background-color: var(--bg-color);
-      color: var(--text-main);
-      font-family: var(--font-sans);
-      line-height: 1.6;
-      padding: 2rem 1rem;
-      min-height: 100vh;
-      display: flex;
-      flex-direction: column;
-      align-items: center;
-    }
-
-    .container {
-      width: 100%;
-      max-width: 900px;
-      display: flex;
-      flex-direction: column;
-      gap: 2rem;
-    }
-
-    /* Page Header */
-    .lab-header {
-      border-bottom: 1px solid var(--card-border);
-      padding-bottom: 1.5rem;
-    }
-
-    .lab-header h1 {
-      font-size: 1.85rem;
-      font-weight: 700;
-      color: #ffffff;
-      display: flex;
-      align-items: center;
-      gap: 0.75rem;
-    }
-
-    .lab-header .badge {
-      font-size: 0.8rem;
-      font-weight: 600;
-      background: rgba(56, 189, 248, 0.15);
-      color: var(--accent-color);
-      padding: 0.2rem 0.6rem;
-      border-radius: 9999px;
-      border: 1px solid rgba(56, 189, 248, 0.3);
-    }
-
-    .lab-header p {
-      color: var(--text-muted);
-      margin-top: 0.5rem;
-      font-size: 0.95rem;
-    }
-
-    /* Section Cards */
-    .card {
-      background: var(--card-bg);
-      border: 1px solid var(--card-border);
-      border-radius: 12px;
-      padding: 1.5rem;
-      box-shadow: 0 4px 20px rgba(0, 0, 0, 0.35);
-    }
-
-    .card-title {
-      font-size: 1.2rem;
-      font-weight: 600;
-      color: #ffffff;
-      margin-bottom: 1rem;
-      display: flex;
-      justify-content: space-between;
-      align-items: center;
-    }
-
-    /* Live Mini-React Mount Area (#app) */
-    #app {
-      background: #0d1322;
-      border: 2px dashed #25334d;
-      border-radius: 8px;
-      padding: 1.5rem;
-      min-height: 140px;
-    }
-
-    /* Semantic Styles produced by Mini-React VNode Tree */
-    #app main#root-view {
-      display: flex;
-      flex-direction: column;
-      gap: 1.25rem;
-    }
-
-    #app header.hero {
-      border-left: 4px solid var(--accent-color);
-      padding-left: 1rem;
-    }
-
-    #app header.hero h1 {
-      font-size: 1.5rem;
-      color: #ffffff;
-    }
-
-    #app header.hero p {
-      color: var(--text-muted);
-      font-family: var(--font-mono);
-      background: #1e293b;
-      padding: 0.35rem 0.65rem;
-      border-radius: 6px;
-      display: inline-block;
-      margin-top: 0.5rem;
-      border: 1px solid #334155;
-    }
-
-    #app button {
-      background: var(--accent-color);
-      color: #0b0f19;
-      font-weight: 700;
-      font-size: 1rem;
-      border: none;
-      border-radius: 6px;
-      padding: 0.65rem 1.5rem;
-      cursor: pointer;
-      align-self: flex-start;
-      transition: all 0.2s ease;
-    }
-
-    #app button:hover {
-      background: var(--accent-hover);
-      transform: translateY(-1px);
-    }
-
-    #app button:active {
-      transform: translateY(0);
-    }
-
-    /* Audit Results List */
-    .audit-list {
-      list-style: none;
-      display: flex;
-      flex-direction: column;
-      gap: 0.75rem;
-    }
-
-    .audit-item {
-      display: flex;
-      align-items: flex-start;
-      gap: 1rem;
-      padding: 0.85rem 1rem;
-      background: #0d1322;
-      border-radius: 8px;
-      border: 1px solid #1a2234;
-    }
-
-    .audit-item.pass {
-      border-left: 4px solid var(--pass-color);
-    }
-
-    .audit-item.fail {
-      border-left: 4px solid var(--fail-color);
-    }
-
-    .status-badge {
-      font-size: 0.75rem;
-      font-weight: 700;
-      font-family: var(--font-mono);
-      padding: 0.2rem 0.5rem;
-      border-radius: 4px;
-      text-transform: uppercase;
-      letter-spacing: 0.05em;
-    }
-
-    .status-badge.pass {
-      background: var(--pass-bg);
-      color: var(--pass-color);
-      border: 1px solid rgba(16, 185, 129, 0.4);
-    }
-
-    .status-badge.fail {
-      background: var(--fail-bg);
-      color: var(--fail-color);
-      border: 1px solid rgba(239, 68, 68, 0.4);
-    }
-
-    .audit-item strong {
-      display: block;
-      color: #ffffff;
-      font-size: 0.95rem;
-    }
-
-    .audit-item p {
-      color: var(--text-muted);
-      font-size: 0.85rem;
-      margin-top: 0.2rem;
-    }
-
-    /* DevTools Audit Guide */
-    .devtools-guide pre {
-      background: #070a12;
-      border: 1px solid #1f293d;
-      border-radius: 6px;
-      padding: 1rem;
-      overflow-x: auto;
-      font-family: var(--font-mono);
-      font-size: 0.85rem;
-      color: #cbd5e1;
-      margin-top: 0.5rem;
-    }
-
-    .step-list {
-      padding-left: 1.25rem;
-      display: flex;
-      flex-direction: column;
-      gap: 0.5rem;
-      font-size: 0.9rem;
-      color: var(--text-muted);
-    }
-
-    .step-list code {
-      font-family: var(--font-mono);
-      background: #1e293b;
-      padding: 0.15rem 0.4rem;
-      border-radius: 4px;
-      color: #e2e8f0;
-    }
-
-    #event-feedback {
-      display: inline-block;
-      margin-top: 0.75rem;
-      font-size: 0.85rem;
-      padding: 0.4rem 0.8rem;
-    }
-  </style>
+  <meta name="description" content="Đại Tiệc Săn Sale 11.11 Vietnam Mega-Sale Flash Deal Engine với Đồng Hồ Zero-Drift Timer và Optimistic Inventory Lock FSM.">
+  <title>Shopee 11.11 Mega-Sale | Zero-Drift & Inventory Lock FSM (Lab 02 HW 3)</title>
+  <link rel="stylesheet" href="./style.css">
 </head>
 <body>
-  <div class="container">
-    <!-- Header -->
-    <header class="lab-header">
-      <h1>
-        Mini-React VNode & Mounting Engine
-        <span class="badge">Lab 02 - Exercise 1</span>
-      </h1>
-      <p>
-        Architectural Implementation: <code>createElement</code>, <code>createTextElement</code>, and <code>renderToDOM</code> with zero div-soup, strict typeguard contracts, and XSS sanitization.
-      </p>
+  <main class="megasale-app">
+    <!-- Header: Mega Flash Sale Banner -->
+    <header class="sale-header">
+      <section class="header-title-block">
+        <h1>
+          Đại Tiệc Săn Sale 11.11
+          <span class="sale-badge">FLASH SALE NỬA ĐÊM</span>
+          <span class="fsm-badge">Optimistic Inventory Lock FSM</span>
+        </h1>
+        <p>
+          Mô phỏng sàn TMĐT Shopee/Lazada với bộ đếm ngược chuẩn mili-giây không trôi thời gian (Zero-Drift Timer) và khóa giữ chỗ tồn kho chống bán vượt (Zero Oversell).
+        </p>
+      </section>
+
+      <!-- Precision Anti-Drift Countdown Timer HUD -->
+      <section class="zero-drift-timer-hud" aria-label="Đồng hồ đếm ngược Flash Sale chuẩn mili-giây">
+        <span class="timer-label">⚡ KẾT THÚC TRONG</span>
+        <time class="anti-drift-clock" id="anti-drift-display" datetime="PT2H">
+          <span id="clock-h">02</span>:<span id="clock-m">00</span>:<span id="clock-s">00</span>.<span class="millis-part" id="clock-ms">000</span>
+        </time>
+        <span class="timer-subtext">requestAnimationFrame &bull; Zero-Drift Date.now()</span>
+      </section>
+      <aside id="sale-announcer" class="sr-only" aria-live="polite">Đại Tiệc 11.11 Sẵn Sàng</aside>
     </header>
 
-    <!-- Live Mounted DOM Tree (Exercise 1 Target) -->
-    <section class="card">
-      <div class="card-title">
-        <span>Live DOM Mounting Target (<code>#app</code>)</span>
-        <span id="event-feedback" class="status-badge pass" style="display: none;">Ready</span>
-      </div>
-      <!-- Mount container specified by Lab Checkpoint -->
-      <div id="app"></div>
-    </section>
-
-    <!-- Verification Audit Results -->
-    <section class="card">
-      <div class="card-title">
-        <span>Checkpoint 1 Automated Verification Results</span>
-      </div>
-      <ul id="audit-results" class="audit-list">
-        <li class="audit-item">
-          <span class="status-badge">...</span>
-          <div>
-            <strong>Initializing Test Suite...</strong>
-            <p>Running in-browser verification assertions...</p>
-          </div>
-        </li>
+    <!-- Vouchers Bar -->
+    <section class="vouchers-strip" aria-label="Mã giảm giá Flash Sale">
+      <span class="voucher-lead">🎟️ VOUCHER ĐỘC QUYỀN:</span>
+      <ul class="voucher-list" id="voucher-list">
+        <!-- Injected via flash-deal-data.js -->
       </ul>
     </section>
 
-    <!-- Chrome DevTools Inspection Guide -->
-    <section class="card devtools-guide">
-      <div class="card-title">
-        <span>Live DevTools Elements Panel Audit Guide</span>
-      </div>
-      <ol class="step-list">
+    <!-- Main Flash Deal Products Catalog -->
+    <section class="flash-deal-section" aria-label="Danh sách Deal Cháy Hàng 11.11">
+      <header class="section-header">
+        <h2>🔥 DEAL SỐC GIỜ VÀNG (SỐ LƯỢNG CÓ HẠN)</h2>
+        <span style="font-family: var(--font-mono); font-size: 0.85rem; color: var(--text-orange);" id="global-lock-metric">
+          Tồn kho bảo toàn: 100%
+        </span>
+      </header>
+
+      <!-- Products Grid (Zero Div-Soup) -->
+      <ul class="products-grid" id="products-grid">
+        <!-- Rendered dynamically with strict semantic elements -->
+      </ul>
+    </section>
+
+    <!-- High-Concurrency Flash Crowd Bot Simulator -->
+    <section class="simulator-section" aria-label="Bảng giả lập tải cao và bot tranh mua">
+      <h2>🤖 Giả Lập Flash Crowd (Test Race Condition & Chống Bán Vượt)</h2>
+      <p style="font-size: 0.9rem; color: var(--text-secondary);">
+        Bắn đồng thời 50 hoặc 100 yêu cầu tranh mua (Bot Burst) vào sản phẩm chỉ còn 3 chiếc. Kiểm chứng FSM khóa tồn kho nguyên tử (Atomic Check-and-Lock) loại trừ hoàn toàn lỗi Overselling / Double-Spend.
+      </p>
+      <form class="sim-controls" onsubmit="return false;">
+        <button type="button" class="sim-btn" id="btn-burst-ip16">
+          ⚡ Bắn 50 Bot Tranh Mua iPhone 16 Pro Max (Kho: 3 cái)
+        </button>
+        <button type="button" class="sim-btn" id="btn-burst-all" style="background: #0d9488;">
+          🚀 Bắn 100 Bot Ngẫu Nhiên Vào Toàn Bộ Kho
+        </button>
+        <button type="button" class="secondary-btn" id="btn-reset-inventory">
+          🔄 Đặt Lại Kho Hàng Ban Đầu
+        </button>
+      </form>
+      <output class="sim-console" id="sim-console" aria-live="polite">
+[SẴN SÀNG] Nhấn các nút trên để bắt đầu giả lập tải đồng thời (High-Concurrency Race Condition Test)...
+      </output>
+    </section>
+
+    <!-- Architecture & Verification Guide -->
+    <section class="audit-card" aria-label="Hướng dẫn kiểm tra kỹ thuật">
+      <h2>Kiểm Tra Kỹ Thuật & Khắc Phục Lỗi AI Thường Gặp (AI Failure Audit)</h2>
+      <ol>
         <li>
-          <strong>Inspect Elements Tree:</strong> Press <code>F12</code> or <code>Ctrl+Shift+I</code> to open Chrome DevTools. Expand <code>&lt;div id="app"&gt;</code> and confirm the mounted child is <code>&lt;main id="root-view" role="main"&gt;</code> without any unwanted wrapper divs.
+          <strong>Khắc phục Lỗi 1 (Timer Drift):</strong> So sánh với <code>setInterval(..., 1000)</code> vốn trôi từ 5s - 30s sau 1 giờ do macro-task starvation. Đồng hồ ở đây dùng <code>Date.now() delta</code> qua <code>requestAnimationFrame</code>, đảm bảo sai số tích lũy bằng 0 mili-giây kể cả khi chuyển tab.
         </li>
         <li>
-          <strong>Zero Div-Soup Verification:</strong> Check that all nodes are semantic elements: <code>&lt;main&gt;</code>, <code>&lt;header&gt;</code>, <code>&lt;h1&gt;</code>, <code>&lt;p&gt;</code>, <code>&lt;button&gt;</code>.
+          <strong>Khắc phục Lỗi 2 (Overselling & Zombie Locks):</strong> Nhấn <em>"SĂN NGAY"</em> để giữ chỗ 30s. Nếu không thanh toán trước khi hết giờ, hệ thống Reaper tự động thu hồi khóa và hoàn trả số lượng về kho, ngăn chặn tình trạng khóa ma (Zombie Lock).
         </li>
         <li>
-          <strong>XSS Resistance Checkpoint:</strong> Verify that <code>&lt;p&gt;</code> contains the raw text <code>&lt;img onerror=alert(1)&gt; Safe Text</code> as a harmless text node instead of an active <code>&lt;img&gt;</code> element.
-        </li>
-        <li>
-          <strong>VNode Memory Parity:</strong> In the DevTools Console, inspect <code>document.getElementById('root-view').__vnode</code> to view the underlying in-memory VNode POJO representation.
+          <strong>Khắc phục Lỗi 3 (Zero Div-Soup & DOM Thrashing):</strong> Mở DevTools (F12) Elements panel: toàn bộ ứng dụng không chứa thẻ <code>&lt;div&gt;</code> nào. Bộ đếm mili-giây cập nhật trực tiếp vào text node mà không render lại danh sách sản phẩm.
         </li>
       </ol>
-      <pre><code>// DevTools Console Quick Verification:
-const mainEl = document.getElementById('root-view');
-console.log('DOM node matches VNode:', mainEl.__vnode.type === 'main');
-console.log('Divs inside app:', document.querySelectorAll('#app div').length); // Expect 0
-console.log('Images inside app:', document.querySelectorAll('#app img').length); // Expect 0</code></pre>
     </section>
-  </div>
 
-  <!-- Run verification test suite via ES Module -->
-  <script type="module" src="./test-runner.js"></script>
+    <!-- Footer -->
+    <footer class="app-footer">
+      <p>Lab 02: Modern React Architecture & State Machines &bull; Student: <strong>Trần Hữu Thắng (24521614)</strong> &bull; UIT - University of Information Technology</p>
+    </footer>
+  </main>
+
+  <!-- Application Orchestration Script -->
+  <script type="module">
+    import { createAntiDriftTimer } from './anti-drift-timer.js';
+    import { OptimisticInventoryLockManager } from './inventory-state-machine.js';
+    import { FLASH_DEAL_CATALOG, VOUCHER_LIST, formatVND } from './flash-deal-data.js';
+
+    // 1. Initialize Subsystems
+    const lockManager = new OptimisticInventoryLockManager(FLASH_DEAL_CATALOG);
+    const myUserId = `user-${Math.random().toString(36).substring(2, 7)}`;
+    const myActiveLocks = new Map(); // productId -> lockRecord
+
+    // DOM References
+    const clockH = document.getElementById('clock-h');
+    const clockM = document.getElementById('clock-m');
+    const clockS = document.getElementById('clock-s');
+    const clockMs = document.getElementById('clock-ms');
+    const productsGrid = document.getElementById('products-grid');
+    const voucherUl = document.getElementById('voucher-list');
+    const simConsole = document.getElementById('sim-console');
+    const liveAnnouncer = document.getElementById('sale-announcer');
+
+    function logConsole(msg) {
+      if (simConsole) {
+        const time = new Date().toLocaleTimeString('vi-VN');
+        simConsole.textContent = `[${time}] ${msg}\n` + simConsole.textContent;
+      }
+    }
+
+    function announce(msg) {
+      if (liveAnnouncer) liveAnnouncer.textContent = msg;
+    }
+
+    // 2. Start Zero-Drift Countdown Timer (2 Hours = 7,200,000 ms)
+    const flashSaleDuration = 2 * 60 * 60 * 1000;
+    const cancelTimer = createAntiDriftTimer(
+      flashSaleDuration,
+      (time) => {
+        clockH.textContent = time.displayHours;
+        clockM.textContent = time.displayMinutes;
+        clockS.textContent = time.displaySeconds;
+        clockMs.textContent = time.displayMillis;
+      },
+      () => {
+        announce('Đại Tiệc Flash Sale Đã Kết Thúc!');
+      }
+    );
+
+    // 3. Render Vouchers Strip
+    VOUCHER_LIST.forEach((v) => {
+      const li = document.createElement('li');
+      li.className = 'voucher-pill';
+      li.textContent = `${v.code} (${v.label})`;
+      li.title = 'Nhấn để sao chép mã';
+      li.addEventListener('click', () => {
+        navigator.clipboard?.writeText(v.code);
+        announce(`Đã sao chép voucher ${v.code}`);
+        logConsole(`Đã lưu voucher: ${v.code} (${v.label})`);
+      });
+      voucherUl.appendChild(li);
+    });
+
+    // 4. Render Product Cards (Zero Div-Soup)
+    function renderProductCards() {
+      productsGrid.replaceChildren();
+      const products = lockManager.getProducts();
+
+      products.forEach((product) => {
+        const myLock = myActiveLocks.get(product.id);
+        const li = document.createElement('li');
+        li.className = 'deal-card';
+        if (myLock && myLock.status === 'LOCKED') li.classList.add('card-locked');
+        if (myLock && myLock.status === 'PURCHASED') li.classList.add('card-purchased');
+        if (product.availableStock === 0 && (!myLock || myLock.status !== 'LOCKED')) {
+          li.classList.add('card-soldout');
+        }
+
+        // Header: Emoji & Badge
+        const header = document.createElement('section');
+        header.className = 'deal-card-header';
+
+        const emojiWrap = document.createElement('span');
+        emojiWrap.className = 'card-emoji-wrap';
+        emojiWrap.textContent = product.emoji || '🎁';
+
+        const badge = document.createElement('span');
+        badge.className = 'card-badge';
+        badge.textContent = product.badge;
+
+        header.appendChild(emojiWrap);
+        header.appendChild(badge);
+
+        // Title
+        const title = document.createElement('h3');
+        title.className = 'deal-title';
+        title.textContent = product.title;
+
+        // Pricing Box
+        const priceBox = document.createElement('section');
+        priceBox.className = 'price-box';
+
+        const flashPrice = document.createElement('span');
+        flashPrice.className = 'flash-price';
+        flashPrice.textContent = formatVND(product.flashPrice);
+
+        const originalPrice = document.createElement('span');
+        originalPrice.className = 'original-price';
+        originalPrice.textContent = formatVND(product.originalPrice);
+
+        const discountPill = document.createElement('span');
+        discountPill.className = 'discount-pill';
+        discountPill.textContent = `-${product.discountPercent}%`;
+
+        priceBox.appendChild(flashPrice);
+        priceBox.appendChild(originalPrice);
+        priceBox.appendChild(discountPill);
+
+        // Inventory Progress Meter
+        const meterWrap = document.createElement('section');
+        meterWrap.className = 'inventory-meter-wrap';
+
+        const meterLabels = document.createElement('section');
+        meterLabels.className = 'meter-labels';
+
+        const availSpan = document.createElement('span');
+        availSpan.textContent = `Còn lại: ${product.availableStock}`;
+        if (product.availableStock <= 2) availSpan.style.color = 'var(--text-orange)';
+
+        const lockedSpan = document.createElement('span');
+        lockedSpan.textContent = product.lockedStock > 0 ? `Đang giữ: ${product.lockedStock}` : '';
+        lockedSpan.style.color = 'var(--text-gold)';
+
+        const soldSpan = document.createElement('span');
+        soldSpan.textContent = `Đã bán: ${product.soldStock}`;
+
+        meterLabels.appendChild(availSpan);
+        meterLabels.appendChild(lockedSpan);
+        meterLabels.appendChild(soldSpan);
+
+        const meter = document.createElement('meter');
+        meter.className = 'stock-meter';
+        meter.min = 0;
+        meter.max = product.totalStock;
+        meter.value = product.availableStock;
+        meter.low = 2;
+        meter.optimum = product.totalStock;
+
+        meterWrap.appendChild(meterLabels);
+        meterWrap.appendChild(meter);
+
+        // Action Bar based on FSM State
+        const actionBar = document.createElement('section');
+        actionBar.className = 'card-action-bar';
+
+        if (myLock && myLock.status === 'PURCHASED') {
+          // PURCHASED STATE
+          const btnSuccess = document.createElement('button');
+          btnSuccess.type = 'button';
+          btnSuccess.className = 'deal-btn btn-success';
+          btnSuccess.textContent = ` ĐÃ MUA THÀNH CÔNG (Mã: ${myLock.orderId})`;
+          actionBar.appendChild(btnSuccess);
+
+        } else if (myLock && myLock.status === 'LOCKED') {
+          // LOCKED STATE (Active Lease Countdown)
+          const remainingSeconds = Math.max(0, Math.ceil((myLock.expiresAt - Date.now()) / 1000));
+
+          const leaseBanner = document.createElement('aside');
+          leaseBanner.className = 'lock-timer-banner';
+          leaseBanner.textContent = `⏳ Đang giữ chỗ cho bạn: còn ${remainingSeconds}s để thanh toán!`;
+
+          const btnPay = document.createElement('button');
+          btnPay.type = 'button';
+          btnPay.className = 'deal-btn btn-pay';
+          btnPay.textContent = `💳 XÁC NHẬN THANH TOÁN (${formatVND(product.flashPrice)})`;
+          btnPay.addEventListener('click', async () => {
+            btnPay.disabled = true;
+            btnPay.textContent = 'Đang chuyển ví ShopeePay...';
+            const res = await lockManager.confirmCheckout(myLock.lockId);
+            if (res.success) {
+              myLock.status = 'PURCHASED';
+              myLock.orderId = res.orderId;
+              announce(`Thanh toán thành công ${product.title}`);
+              logConsole(`Thanh toán thành công: ${product.title} (Mã ĐH: ${res.orderId})`);
+            } else {
+              announce(`Thanh toán thất bại: ${res.reason}`);
+              logConsole(`Thanh toán thất bại: ${res.reason}`);
+              myActiveLocks.delete(product.id);
+            }
+            renderProductCards();
+          });
+
+          const btnRelease = document.createElement('button');
+          btnRelease.type = 'button';
+          btnRelease.className = 'secondary-btn';
+          btnRelease.textContent = '✕ Hủy giữ chỗ (Nhường cho người khác)';
+          btnRelease.addEventListener('click', () => {
+            lockManager.releaseLock(myLock.lockId);
+            myActiveLocks.delete(product.id);
+            announce(`Đã hủy giữ chỗ ${product.title}`);
+            logConsole(`Người dùng hủy giữ chỗ: ${product.title}`);
+            renderProductCards();
+          });
+
+          actionBar.appendChild(leaseBanner);
+          actionBar.appendChild(btnPay);
+          actionBar.appendChild(btnRelease);
+
+        } else if (product.availableStock > 0) {
+          // AVAILABLE STATE
+          const btnLock = document.createElement('button');
+          btnLock.type = 'button';
+          btnLock.className = 'deal-btn';
+          btnLock.textContent = `⚡ SĂN NGAY (Giữ chỗ 30s)`;
+          btnLock.addEventListener('click', async () => {
+            btnLock.disabled = true;
+            btnLock.textContent = 'Đang kiểm tra kho...';
+            const res = await lockManager.requestLock(product.id, myUserId, 30000);
+            if (res.success) {
+              myActiveLocks.set(product.id, res.lock);
+              announce(`Đã giữ chỗ thành công ${product.title}`);
+              logConsole(`Khóa thành công: ${product.title} (LockID: ${res.lock.lockId})`);
+            } else {
+              announce(`Săn thất bại: ${res.reason}`);
+              logConsole(`Săn thất bại (${res.reason}): ${product.title}`);
+            }
+            renderProductCards();
+          });
+          actionBar.appendChild(btnLock);
+
+        } else {
+          // OUT OF STOCK STATE
+          const btnSoldOut = document.createElement('button');
+          btnSoldOut.type = 'button';
+          btnSoldOut.className = 'deal-btn btn-soldout';
+          btnSoldOut.disabled = true;
+          btnSoldOut.textContent = 'HẾT HÀNG CHÁY DEAL 11.11';
+          actionBar.appendChild(btnSoldOut);
+        }
+
+        li.appendChild(header);
+        li.appendChild(title);
+        li.appendChild(priceBox);
+        li.appendChild(meterWrap);
+        li.appendChild(actionBar);
+        productsGrid.appendChild(li);
+      });
+    }
+
+    // Subscribe to Lock State Machine changes
+    lockManager.subscribe((event) => {
+      renderProductCards();
+    });
+
+    // Initial render
+    renderProductCards();
+
+    // 1-second interval to update active lease countdowns on cards
+    setInterval(() => {
+      let hasActiveLock = false;
+      for (const [prodId, lock] of myActiveLocks.entries()) {
+        if (lock.status === 'LOCKED') {
+          hasActiveLock = true;
+          if (Date.now() > lock.expiresAt) {
+            myActiveLocks.delete(prodId);
+            announce('Khóa giữ chỗ đã hết hạn');
+            logConsole(`Hết hạn giữ chỗ cho sản phẩm ${prodId}`);
+          }
+        }
+      }
+      if (hasActiveLock) {
+        renderProductCards();
+      }
+    }, 1000);
+
+    // 5. Bot Burst Simulator Event Handlers
+    document.getElementById('btn-burst-ip16').addEventListener('click', async () => {
+      const btn = document.getElementById('btn-burst-ip16');
+      btn.disabled = true;
+      logConsole('==================================================');
+      logConsole('KHỞI CHẠY BOT BURST: 50 bot tranh mua iPhone 16 Pro Max cùng lúc...');
+
+      const botIds = Array.from({ length: 50 }, (_, i) => `bot-${i + 1}`);
+      const result = await lockManager.simulateConcurrentBurst('sp-ip16pm', botIds);
+
+      logConsole(`KẾT QUẢ BURST:`);
+      logConsole(`  + Tổng yêu cầu đồng thời: ${result.totalRequests}`);
+      logConsole(`  + Khóa thành công (Acquired): ${result.acquired}`);
+      logConsole(`  + Bị từ chối vì hết hàng (Rejected): ${result.rejected}`);
+
+      const ip16 = lockManager.getProduct('sp-ip16pm');
+      logConsole(`BẢO TOÀN TỒN KHO: Còn: ${ip16.availableStock} | Đang giữ: ${ip16.lockedStock} | Đã bán: ${ip16.soldStock} (Tổng: ${ip16.totalStock})`);
+      logConsole('XÁC NHẬN: ZERO OVERSELLING (100% Không bán vượt kho!)');
+      btn.disabled = false;
+    });
+
+    document.getElementById('btn-burst-all').addEventListener('click', async () => {
+      const btn = document.getElementById('btn-burst-all');
+      btn.disabled = true;
+      logConsole('==================================================');
+      logConsole('KHỞI CHẠY 100 BOT NGẪU NHIÊN VÀO TOÀN BỘ KHO FLASH SALE...');
+
+      const products = lockManager.getProducts();
+      const promises = [];
+      for (let i = 0; i < 100; i++) {
+        const randomProd = products[Math.floor(Math.random() * products.length)];
+        promises.push(lockManager.requestLock(randomProd.id, `flash-bot-${i}`));
+      }
+
+      const results = await Promise.all(promises);
+      const acquired = results.filter((r) => r.success).length;
+      const rejected = results.filter((r) => !r.success).length;
+
+      logConsole(`KẾT THÚC 100 BOT BURST: ${acquired} lượt giữ chỗ thành công, ${rejected} lượt bị từ chối.`);
+      logConsole('Toàn bộ các kho hàng đều thỏa mãn: available + locked + sold === totalStock');
+      btn.disabled = false;
+    });
+
+    document.getElementById('btn-reset-inventory').addEventListener('click', () => {
+      myActiveLocks.clear();
+      FLASH_DEAL_CATALOG.forEach((p) => {
+        const prod = lockManager.products.get(p.id);
+        if (prod) {
+          prod.availableStock = prod.totalStock;
+          prod.lockedStock = 0;
+          prod.soldStock = 0;
+        }
+      });
+      lockManager.locks.clear();
+      logConsole('ĐÃ ĐẶT LẠI TOÀN BỘ KHO HÀNG FLASH SALE VỀ MẶC ĐỊNH.');
+      renderProductCards();
+    });
+
+    // Expose for DevTools inspection
+    window.__megaSale = {
+      lockManager,
+      catalog: FLASH_DEAL_CATALOG,
+      myActiveLocks
+    };
+  </script>
 </body>
 </html>

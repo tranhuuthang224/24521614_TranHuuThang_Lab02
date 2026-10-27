@@ -1,0 +1,590 @@
+/**
+ * Vietnam Mega-Sale 11.11 Flash Deal Stylesheet
+ * Shopee / Lazada Midnight Cyber Sale Theme & WCAG 2.2 AA Compliant
+ * Zero Div-Soup Architecture
+ */
+
+:root {
+  /* Shopee 11.11 Brand & Midnight Palette */
+  --bg-page: #080b11;
+  --bg-panel: #0e1422;
+  --bg-card: #151d30;
+  --bg-card-hover: #1c2740;
+  --bg-clock: #111827;
+
+  --shopee-orange: #ee4d2d;
+  --shopee-red: #d0011b;
+  --shopee-orange-glow: rgba(238, 77, 45, 0.35);
+
+  --border-color: #26334d;
+  --border-focus: #38bdf8;
+  --border-orange: #f97316;
+
+  /* Typography Colors (All >= 4.5:1 contrast against dark background) */
+  --text-primary: #f8fafc;     /* 16.5:1 */
+  --text-secondary: #cbd5e1;   /* 10.8:1 */
+  --text-muted: #94a3b8;       /* 6.1:1 (Passes AA) */
+  --text-gold: #fbbf24;        /* 9.8:1 */
+  --text-green: #4ade80;       /* 10.2:1 */
+  --text-orange: #fb923c;      /* 7.8:1 */
+
+  /* Fonts */
+  --font-sans: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+  --font-mono: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+}
+
+* {
+  box-sizing: border-box;
+  margin: 0;
+  padding: 0;
+}
+
+body {
+  background-color: var(--bg-page);
+  color: var(--text-primary);
+  font-family: var(--font-sans);
+  line-height: 1.6;
+  min-height: 100vh;
+  padding: 1.5rem 1rem;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+}
+
+.sr-only {
+  position: absolute !important;
+  width: 1px !important;
+  height: 1px !important;
+  padding: 0 !important;
+  margin: -1px !important;
+  overflow: hidden !important;
+  clip: rect(0, 0, 0, 0) !important;
+  white-space: nowrap !important;
+  border: 0 !important;
+}
+
+/* App Container */
+main.megasale-app {
+  width: 100%;
+  max-width: 1200px;
+  display: flex;
+  flex-direction: column;
+  gap: 1.5rem;
+}
+
+/* Sale Header */
+header.sale-header {
+  background: linear-gradient(135deg, #1e1115 0%, #151d30 50%, #0d121f 100%);
+  border: 2px solid var(--shopee-orange);
+  border-radius: 16px;
+  padding: 1.5rem 2rem;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 1.5rem;
+  flex-wrap: wrap;
+  box-shadow: 0 8px 32px var(--shopee-orange-glow);
+}
+
+.header-title-block h1 {
+  font-size: 1.85rem;
+  font-weight: 800;
+  color: #ffffff;
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  flex-wrap: wrap;
+}
+
+.sale-badge {
+  background: var(--shopee-orange);
+  color: #ffffff;
+  font-size: 0.8rem;
+  font-weight: 800;
+  font-family: var(--font-mono);
+  padding: 0.25rem 0.65rem;
+  border-radius: 6px;
+  letter-spacing: 0.05em;
+}
+
+.fsm-badge {
+  background: rgba(56, 189, 248, 0.15);
+  color: var(--border-focus);
+  border: 1px solid rgba(56, 189, 248, 0.4);
+  font-size: 0.8rem;
+  font-weight: 700;
+  font-family: var(--font-mono);
+  padding: 0.25rem 0.65rem;
+  border-radius: 6px;
+}
+
+.header-title-block p {
+  color: var(--text-secondary);
+  font-size: 0.95rem;
+  margin-top: 0.35rem;
+}
+
+/* Countdown Clock Display (Zero-Drift Millisecond HUD) */
+section.zero-drift-timer-hud {
+  background: var(--bg-clock);
+  border: 2px solid var(--border-orange);
+  border-radius: 12px;
+  padding: 0.85rem 1.25rem;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.35rem;
+  box-shadow: 0 4px 20px rgba(249, 115, 22, 0.2);
+}
+
+.timer-label {
+  font-size: 0.75rem;
+  font-weight: 700;
+  color: var(--text-orange);
+  font-family: var(--font-mono);
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+}
+
+time.anti-drift-clock {
+  font-family: var(--font-mono);
+  font-size: 2.2rem;
+  font-weight: 900;
+  color: #ffffff;
+  letter-spacing: 0.05em;
+  text-shadow: 0 0 16px rgba(238, 77, 45, 0.8);
+  display: flex;
+  align-items: baseline;
+  gap: 0.25rem;
+}
+
+.millis-part {
+  font-size: 1.2rem;
+  color: var(--text-orange);
+}
+
+.timer-subtext {
+  font-size: 0.72rem;
+  color: var(--text-muted);
+  font-family: var(--font-mono);
+}
+
+/* Flash Vouchers Banner */
+section.vouchers-strip {
+  background: var(--bg-panel);
+  border: 1px solid var(--border-color);
+  border-radius: 12px;
+  padding: 0.85rem 1.25rem;
+  display: flex;
+  align-items: center;
+  gap: 1rem;
+  flex-wrap: wrap;
+}
+
+.voucher-lead {
+  font-weight: 700;
+  color: var(--text-gold);
+  font-size: 0.9rem;
+  white-space: nowrap;
+}
+
+ul.voucher-list {
+  list-style: none;
+  display: flex;
+  gap: 0.75rem;
+  flex-wrap: wrap;
+}
+
+li.voucher-pill {
+  background: rgba(251, 191, 36, 0.12);
+  border: 1px dashed var(--text-gold);
+  color: var(--text-gold);
+  padding: 0.3rem 0.65rem;
+  border-radius: 6px;
+  font-size: 0.8rem;
+  font-family: var(--font-mono);
+  font-weight: 700;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+
+li.voucher-pill:hover {
+  background: rgba(251, 191, 36, 0.25);
+}
+
+/* Products Grid Section */
+section.flash-deal-section {
+  display: flex;
+  flex-direction: column;
+  gap: 1rem;
+}
+
+header.section-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 1rem;
+}
+
+header.section-header h2 {
+  font-size: 1.4rem;
+  font-weight: 800;
+  color: var(--text-primary);
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+/* Product Cards Grid */
+ul.products-grid {
+  list-style: none;
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(350px, 1fr));
+  gap: 1.25rem;
+}
+
+li.deal-card {
+  background: var(--bg-card);
+  border: 1px solid var(--border-color);
+  border-radius: 12px;
+  padding: 1.25rem;
+  display: flex;
+  flex-direction: column;
+  gap: 0.85rem;
+  transition: border-color 0.2s, box-shadow 0.2s, transform 0.2s;
+}
+
+li.deal-card:hover {
+  border-color: var(--border-orange);
+  box-shadow: 0 8px 24px rgba(238, 77, 45, 0.15);
+  transform: translateY(-2px);
+}
+
+li.deal-card.card-locked {
+  border-color: var(--text-gold);
+  background: rgba(251, 191, 36, 0.05);
+  box-shadow: 0 0 20px rgba(251, 191, 36, 0.2);
+}
+
+li.deal-card.card-purchased {
+  border-color: var(--text-green);
+  background: rgba(74, 222, 128, 0.05);
+}
+
+li.deal-card.card-soldout {
+  opacity: 0.65;
+  border-style: dashed;
+}
+
+.deal-card-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  gap: 0.5rem;
+}
+
+.card-emoji-wrap {
+  font-size: 2.2rem;
+  background: var(--bg-panel);
+  border: 1px solid var(--border-color);
+  width: 56px;
+  height: 56px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 10px;
+}
+
+.card-badge {
+  background: rgba(238, 77, 45, 0.2);
+  color: var(--shopee-orange);
+  border: 1px solid rgba(238, 77, 45, 0.4);
+  font-size: 0.75rem;
+  font-weight: 800;
+  font-family: var(--font-mono);
+  padding: 0.2rem 0.5rem;
+  border-radius: 4px;
+}
+
+.deal-title {
+  font-size: 1.05rem;
+  font-weight: 700;
+  color: var(--text-primary);
+  line-height: 1.4;
+}
+
+/* Price Box */
+.price-box {
+  display: flex;
+  align-items: baseline;
+  gap: 0.75rem;
+}
+
+.flash-price {
+  font-size: 1.45rem;
+  font-weight: 900;
+  color: var(--shopee-orange);
+  font-family: var(--font-mono);
+}
+
+.original-price {
+  font-size: 0.9rem;
+  color: var(--text-muted);
+  text-decoration: line-through;
+  font-family: var(--font-mono);
+}
+
+.discount-pill {
+  background: var(--shopee-red);
+  color: #ffffff;
+  font-size: 0.75rem;
+  font-weight: 800;
+  font-family: var(--font-mono);
+  padding: 0.1rem 0.4rem;
+  border-radius: 4px;
+}
+
+/* Inventory Progress Meter */
+section.inventory-meter-wrap {
+  display: flex;
+  flex-direction: column;
+  gap: 0.35rem;
+}
+
+.meter-labels {
+  display: flex;
+  justify-content: space-between;
+  font-size: 0.8rem;
+  font-family: var(--font-mono);
+  color: var(--text-secondary);
+}
+
+meter.stock-meter {
+  width: 100%;
+  height: 8px;
+  border-radius: 9999px;
+  overflow: hidden;
+}
+
+/* FSM State & Action Buttons */
+.card-action-bar {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+  margin-top: auto;
+}
+
+button.deal-btn {
+  background: var(--shopee-orange);
+  color: #ffffff;
+  border: none;
+  border-radius: 8px;
+  padding: 0.75rem 1rem;
+  font-size: 0.95rem;
+  font-weight: 800;
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.5rem;
+  min-height: 48px;
+  transition: all 0.2s;
+  box-shadow: 0 4px 12px var(--shopee-orange-glow);
+}
+
+button.deal-btn:hover:not(:disabled) {
+  background: #f05d40;
+  transform: translateY(-1px);
+}
+
+button.deal-btn.btn-pay {
+  background: var(--text-gold);
+  color: #0b0f19;
+  box-shadow: 0 4px 12px rgba(251, 191, 36, 0.4);
+}
+
+button.deal-btn.btn-pay:hover:not(:disabled) {
+  background: #f59e0b;
+}
+
+button.deal-btn.btn-soldout {
+  background: #334155;
+  color: var(--text-muted);
+  box-shadow: none;
+  cursor: not-allowed;
+}
+
+button.deal-btn.btn-success {
+  background: rgba(74, 222, 128, 0.2);
+  color: var(--text-green);
+  border: 1px solid var(--text-green);
+  box-shadow: none;
+  cursor: default;
+}
+
+button.deal-btn:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+  transform: none;
+}
+
+button.deal-btn:focus-visible,
+button.secondary-btn:focus-visible {
+  outline: 3px solid var(--border-focus);
+  outline-offset: 2px;
+}
+
+button.secondary-btn {
+  background: transparent;
+  color: var(--text-muted);
+  border: 1px solid var(--border-color);
+  border-radius: 6px;
+  padding: 0.4rem 0.75rem;
+  font-size: 0.8rem;
+  font-weight: 600;
+  cursor: pointer;
+  min-height: 40px;
+}
+
+button.secondary-btn:hover {
+  color: var(--text-primary);
+  border-color: var(--text-secondary);
+}
+
+/* Active Lock Lease Timer Banner */
+aside.lock-timer-banner {
+  background: rgba(251, 191, 36, 0.15);
+  border: 1px solid var(--text-gold);
+  border-radius: 6px;
+  padding: 0.5rem 0.75rem;
+  font-size: 0.82rem;
+  font-family: var(--font-mono);
+  color: var(--text-gold);
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+/* Concurrency Simulator & Bot Burst Section */
+section.simulator-section {
+  background: var(--bg-panel);
+  border: 1px solid var(--border-color);
+  border-radius: 14px;
+  padding: 1.5rem;
+  display: flex;
+  flex-direction: column;
+  gap: 1rem;
+}
+
+section.simulator-section h2 {
+  font-size: 1.25rem;
+  font-weight: 800;
+  color: var(--text-primary);
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+form.sim-controls {
+  display: flex;
+  align-items: center;
+  gap: 1rem;
+  flex-wrap: wrap;
+}
+
+button.sim-btn {
+  background: #2563eb;
+  color: #ffffff;
+  border: none;
+  border-radius: 8px;
+  padding: 0.65rem 1.25rem;
+  font-size: 0.9rem;
+  font-weight: 700;
+  cursor: pointer;
+  min-height: 44px;
+}
+
+button.sim-btn:hover {
+  background: #1d4ed8;
+}
+
+/* Simulation Output Console */
+output.sim-console {
+  background: #030712;
+  border: 1px solid var(--border-color);
+  border-radius: 8px;
+  padding: 1rem;
+  font-family: var(--font-mono);
+  font-size: 0.85rem;
+  color: #a7f3d0;
+  white-space: pre-wrap;
+  max-height: 220px;
+  overflow-y: auto;
+  display: block;
+}
+
+/* Verification Guide Card */
+section.audit-card {
+  background: var(--bg-panel);
+  border: 1px solid var(--border-color);
+  border-radius: 14px;
+  padding: 1.5rem;
+  display: flex;
+  flex-direction: column;
+  gap: 0.85rem;
+}
+
+section.audit-card h2 {
+  font-size: 1.2rem;
+  font-weight: 800;
+  color: var(--text-primary);
+}
+
+section.audit-card ol {
+  padding-left: 1.25rem;
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+  font-size: 0.92rem;
+  color: var(--text-secondary);
+}
+
+section.audit-card kbd {
+  background: var(--bg-card);
+  border: 1px solid var(--border-color);
+  border-radius: 4px;
+  padding: 0.15rem 0.4rem;
+  font-family: var(--font-mono);
+  color: var(--border-focus);
+}
+
+/* Footer */
+footer.app-footer {
+  text-align: center;
+  color: var(--text-muted);
+  font-size: 0.85rem;
+  padding: 1.25rem 0;
+  border-top: 1px solid var(--border-color);
+}
+
+/* Responsive Media Queries */
+@media (max-width: 768px) {
+  body {
+    padding: 1rem 0.5rem;
+  }
+
+  header.sale-header {
+    padding: 1.25rem 1rem;
+    flex-direction: column;
+    align-items: stretch;
+  }
+
+  time.anti-drift-clock {
+    font-size: 1.75rem;
+  }
+
+  ul.products-grid {
+    grid-template-columns: 1fr;
+  }
+}
