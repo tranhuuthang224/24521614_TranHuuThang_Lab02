@@ -3,324 +3,525 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Lab 02 - Exercise 1: Mini-React VNode & Mounting Engine</title>
-  <style>
-    :root {
-      --bg-color: #0b0f19;
-      --card-bg: #111827;
-      --card-border: #1f293d;
-      --text-main: #f3f4f6;
-      --text-muted: #9ca3af;
-      --accent-color: #38bdf8;
-      --accent-hover: #0284c7;
-      --pass-color: #10b981;
-      --pass-bg: rgba(16, 185, 129, 0.15);
-      --fail-color: #ef4444;
-      --fail-bg: rgba(239, 68, 68, 0.15);
-      --font-mono: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
-      --font-sans: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
-    }
-
-    * {
-      box-sizing: border-box;
-      margin: 0;
-      padding: 0;
-    }
-
-    body {
-      background-color: var(--bg-color);
-      color: var(--text-main);
-      font-family: var(--font-sans);
-      line-height: 1.6;
-      padding: 2rem 1rem;
-      min-height: 100vh;
-      display: flex;
-      flex-direction: column;
-      align-items: center;
-    }
-
-    .container {
-      width: 100%;
-      max-width: 900px;
-      display: flex;
-      flex-direction: column;
-      gap: 2rem;
-    }
-
-    /* Page Header */
-    .lab-header {
-      border-bottom: 1px solid var(--card-border);
-      padding-bottom: 1.5rem;
-    }
-
-    .lab-header h1 {
-      font-size: 1.85rem;
-      font-weight: 700;
-      color: #ffffff;
-      display: flex;
-      align-items: center;
-      gap: 0.75rem;
-    }
-
-    .lab-header .badge {
-      font-size: 0.8rem;
-      font-weight: 600;
-      background: rgba(56, 189, 248, 0.15);
-      color: var(--accent-color);
-      padding: 0.2rem 0.6rem;
-      border-radius: 9999px;
-      border: 1px solid rgba(56, 189, 248, 0.3);
-    }
-
-    .lab-header p {
-      color: var(--text-muted);
-      margin-top: 0.5rem;
-      font-size: 0.95rem;
-    }
-
-    /* Section Cards */
-    .card {
-      background: var(--card-bg);
-      border: 1px solid var(--card-border);
-      border-radius: 12px;
-      padding: 1.5rem;
-      box-shadow: 0 4px 20px rgba(0, 0, 0, 0.35);
-    }
-
-    .card-title {
-      font-size: 1.2rem;
-      font-weight: 600;
-      color: #ffffff;
-      margin-bottom: 1rem;
-      display: flex;
-      justify-content: space-between;
-      align-items: center;
-    }
-
-    /* Live Mini-React Mount Area (#app) */
-    #app {
-      background: #0d1322;
-      border: 2px dashed #25334d;
-      border-radius: 8px;
-      padding: 1.5rem;
-      min-height: 140px;
-    }
-
-    /* Semantic Styles produced by Mini-React VNode Tree */
-    #app main#root-view {
-      display: flex;
-      flex-direction: column;
-      gap: 1.25rem;
-    }
-
-    #app header.hero {
-      border-left: 4px solid var(--accent-color);
-      padding-left: 1rem;
-    }
-
-    #app header.hero h1 {
-      font-size: 1.5rem;
-      color: #ffffff;
-    }
-
-    #app header.hero p {
-      color: var(--text-muted);
-      font-family: var(--font-mono);
-      background: #1e293b;
-      padding: 0.35rem 0.65rem;
-      border-radius: 6px;
-      display: inline-block;
-      margin-top: 0.5rem;
-      border: 1px solid #334155;
-    }
-
-    #app button {
-      background: var(--accent-color);
-      color: #0b0f19;
-      font-weight: 700;
-      font-size: 1rem;
-      border: none;
-      border-radius: 6px;
-      padding: 0.65rem 1.5rem;
-      cursor: pointer;
-      align-self: flex-start;
-      transition: all 0.2s ease;
-    }
-
-    #app button:hover {
-      background: var(--accent-hover);
-      transform: translateY(-1px);
-    }
-
-    #app button:active {
-      transform: translateY(0);
-    }
-
-    /* Audit Results List */
-    .audit-list {
-      list-style: none;
-      display: flex;
-      flex-direction: column;
-      gap: 0.75rem;
-    }
-
-    .audit-item {
-      display: flex;
-      align-items: flex-start;
-      gap: 1rem;
-      padding: 0.85rem 1rem;
-      background: #0d1322;
-      border-radius: 8px;
-      border: 1px solid #1a2234;
-    }
-
-    .audit-item.pass {
-      border-left: 4px solid var(--pass-color);
-    }
-
-    .audit-item.fail {
-      border-left: 4px solid var(--fail-color);
-    }
-
-    .status-badge {
-      font-size: 0.75rem;
-      font-weight: 700;
-      font-family: var(--font-mono);
-      padding: 0.2rem 0.5rem;
-      border-radius: 4px;
-      text-transform: uppercase;
-      letter-spacing: 0.05em;
-    }
-
-    .status-badge.pass {
-      background: var(--pass-bg);
-      color: var(--pass-color);
-      border: 1px solid rgba(16, 185, 129, 0.4);
-    }
-
-    .status-badge.fail {
-      background: var(--fail-bg);
-      color: var(--fail-color);
-      border: 1px solid rgba(239, 68, 68, 0.4);
-    }
-
-    .audit-item strong {
-      display: block;
-      color: #ffffff;
-      font-size: 0.95rem;
-    }
-
-    .audit-item p {
-      color: var(--text-muted);
-      font-size: 0.85rem;
-      margin-top: 0.2rem;
-    }
-
-    /* DevTools Audit Guide */
-    .devtools-guide pre {
-      background: #070a12;
-      border: 1px solid #1f293d;
-      border-radius: 6px;
-      padding: 1rem;
-      overflow-x: auto;
-      font-family: var(--font-mono);
-      font-size: 0.85rem;
-      color: #cbd5e1;
-      margin-top: 0.5rem;
-    }
-
-    .step-list {
-      padding-left: 1.25rem;
-      display: flex;
-      flex-direction: column;
-      gap: 0.5rem;
-      font-size: 0.9rem;
-      color: var(--text-muted);
-    }
-
-    .step-list code {
-      font-family: var(--font-mono);
-      background: #1e293b;
-      padding: 0.15rem 0.4rem;
-      border-radius: 4px;
-      color: #e2e8f0;
-    }
-
-    #event-feedback {
-      display: inline-block;
-      margin-top: 0.75rem;
-      font-size: 0.85rem;
-      padding: 0.4rem 0.8rem;
-    }
-  </style>
+  <meta name="description" content="Concurrent FIFO Audio Visualizer Queue Engine with Web Audio AnalyserNode (FFT 256/512), AbortController cancellation, 60fps canvas visualizer and zero memory leaks.">
+  <title>Concurrent FIFO Audio Visualizer Engine | Lab 02 - HW 2</title>
+  <link rel="stylesheet" href="./style.css">
 </head>
 <body>
-  <div class="container">
-    <!-- Header -->
-    <header class="lab-header">
-      <h1>
-        Mini-React VNode & Mounting Engine
-        <span class="badge">Lab 02 - Exercise 1</span>
-      </h1>
-      <p>
-        Architectural Implementation: <code>createElement</code>, <code>createTextElement</code>, and <code>renderToDOM</code> with zero div-soup, strict typeguard contracts, and XSS sanitization.
-      </p>
+  <main class="audio-studio-app">
+    <!-- Studio Header -->
+    <header class="studio-header">
+      <article>
+        <h1>
+          Concurrent FIFO Audio Visualizer Engine
+          <span class="studio-pill">Web Audio API (FFT 256/512)</span>
+          <span class="mem-safe-pill">Zero Memory Leaks</span>
+        </h1>
+        <p>
+          Advanced async concurrency controller with AbortController cancellation tokens, decoupled 60fps Canvas spectrum analysis, and verifiable source disconnection.
+        </p>
+      </article>
+      <aside id="audio-live-status" class="sr-only" aria-live="polite">Audio Engine Ready</aside>
     </header>
 
-    <!-- Live Mounted DOM Tree (Exercise 1 Target) -->
-    <section class="card">
-      <div class="card-title">
-        <span>Live DOM Mounting Target (<code>#app</code>)</span>
-        <span id="event-feedback" class="status-badge pass" style="display: none;">Ready</span>
-      </div>
-      <!-- Mount container specified by Lab Checkpoint -->
-      <div id="app"></div>
+    <!-- Visualizer Canvas & Telemetry HUD -->
+    <section class="visualizer-section" aria-label="Audio Visualizer Canvas and Telemetry">
+      <header class="visualizer-toolbar">
+        <nav class="mode-selector" aria-label="Visualizer Mode Selection">
+          <button type="button" class="mode-btn active-mode" id="btn-mode-bars">📊 Frequency Bars</button>
+          <button type="button" class="mode-btn" id="btn-mode-waveform">〰 Oscilloscope</button>
+          <button type="button" class="mode-btn" id="btn-mode-radial">🌀 Radial Spectrum</button>
+        </nav>
+        <form class="audio-settings-form" onsubmit="return false;">
+          <section class="setting-group">
+            <label for="fft-size-select">FFT Resolution:</label>
+            <select id="fft-size-select" class="studio-select" aria-label="Select FFT Size">
+              <option value="512" selected>512 Bins (High Precision)</option>
+              <option value="256">256 Bins (Low Latency)</option>
+            </select>
+          </section>
+        </form>
+      </header>
+
+      <!-- 60fps Canvas Display -->
+      <canvas id="visualizer-canvas" role="img" aria-label="Audio frequency and waveform visualizer"></canvas>
+
+      <!-- Real-Time Telemetry HUD -->
+      <aside class="telemetry-hud" aria-label="Performance and Audio Telemetry">
+        <span class="hud-item">
+          <span class="hud-label">FPS:</span>
+          <span class="hud-val fps-good" id="hud-fps">60.0</span>
+        </span>
+        <span class="hud-item">
+          <span class="hud-label">Dropped Frames:</span>
+          <span class="hud-val" id="hud-dropped">0</span>
+        </span>
+        <span class="hud-item">
+          <span class="hud-label">Active Sources:</span>
+          <span class="hud-val" id="hud-active-sources">0</span>
+        </span>
+        <span class="hud-item">
+          <span class="hud-label">Sources Cleaned Up:</span>
+          <span class="hud-val" id="hud-cleaned-sources">0</span>
+        </span>
+        <span class="hud-item">
+          <span class="hud-label">Context State:</span>
+          <span class="hud-val" id="hud-ctx-state">SUSPENDED</span>
+        </span>
+      </aside>
     </section>
 
-    <!-- Verification Audit Results -->
-    <section class="card">
-      <div class="card-title">
-        <span>Checkpoint 1 Automated Verification Results</span>
-      </div>
-      <ul id="audit-results" class="audit-list">
-        <li class="audit-item">
-          <span class="status-badge">...</span>
-          <div>
-            <strong>Initializing Test Suite...</strong>
-            <p>Running in-browser verification assertions...</p>
-          </div>
-        </li>
-      </ul>
+    <!-- Transport & Playback Control Center -->
+    <section class="transport-panel" aria-label="Audio Transport and Playback Controls">
+      <!-- Now Playing Card -->
+      <article class="now-playing-card">
+        <section class="now-playing-info">
+          <strong class="now-playing-title" id="now-playing-title">No Track Playing</strong>
+          <span class="now-playing-artist" id="now-playing-artist">Queue is idle &bull; Select a track below to enqueue</span>
+        </section>
+        <section class="now-playing-timing">
+          <span class="hud-val" id="playback-time-display">0:00 / 0:00</span>
+        </section>
+      </article>
+
+      <!-- Transport Controls Bar -->
+      <header class="visualizer-toolbar">
+        <nav class="transport-controls" aria-label="Playback Transport Controls">
+          <button type="button" class="control-btn btn-primary" id="btn-play-pause">▶ Play</button>
+          <button type="button" class="control-btn" id="btn-stop">⏹ Stop</button>
+          <button type="button" class="control-btn" id="btn-next">⏭ Next Track</button>
+          <button type="button" class="control-btn btn-danger" id="btn-cancel-current">⛔ Cancel Download</button>
+          <button type="button" class="control-btn" id="btn-clear-queue">🗑 Clear Queue</button>
+        </nav>
+
+        <form class="audio-settings-form" onsubmit="return false;">
+          <section class="setting-group">
+            <label for="volume-slider">Volume:</label>
+            <input type="range" id="volume-slider" min="0" max="1" step="0.01" value="0.8" aria-label="Volume Slider">
+            <output id="volume-readout" for="volume-slider" style="font-family: var(--font-mono); font-size: 0.85rem; width: 42px;">80%</output>
+          </section>
+        </form>
+      </header>
     </section>
 
-    <!-- Chrome DevTools Inspection Guide -->
-    <section class="card devtools-guide">
-      <div class="card-title">
-        <span>Live DevTools Elements Panel Audit Guide</span>
-      </div>
-      <ol class="step-list">
+    <!-- Dual Column Grid: Track Catalog & FIFO Queue Manager -->
+    <section class="queue-and-tracks-grid">
+      <!-- Left Column: Synthetic Track Catalog (Zero CORS, 100% Offline) -->
+      <section class="synthetic-panel" aria-labelledby="catalog-heading">
+        <header style="display: flex; justify-content: space-between; align-items: center; gap: 0.5rem; flex-wrap: wrap;">
+          <h2 id="catalog-heading">Procedural Audio Catalog</h2>
+          <button type="button" class="enqueue-btn" id="btn-enqueue-all" style="background: rgba(56, 189, 248, 0.15); border-color: var(--border-neon);">
+            ⚡ Enqueue All 4 (FIFO Test)
+          </button>
+        </header>
+        <p style="font-size: 0.85rem; color: var(--text-muted);">
+          16-bit 44.1kHz PCM synthesized in browser memory. Never fails CORS!
+        </p>
+        <ul class="catalog-list" id="synthetic-catalog-list">
+          <!-- Dynamically populated from synthetic-tracks.js -->
+        </ul>
+
+        <!-- Custom Upload & URL Input -->
+        <form class="custom-track-form" id="custom-track-form" onsubmit="return false;" style="margin-top: 0.5rem; display: flex; flex-direction: column; gap: 0.65rem;">
+          <label for="custom-file-input" style="font-size: 0.85rem; font-weight: 600; color: var(--text-secondary);">
+            📁 Or Upload Local Audio File (MP3/WAV/OGG):
+          </label>
+          <input type="file" id="custom-file-input" accept="audio/*" style="font-size: 0.85rem; color: var(--text-muted); cursor: pointer;">
+        </form>
+      </section>
+
+      <!-- Right Column: Concurrent FIFO Queue Status -->
+      <section class="queue-panel" aria-labelledby="queue-heading">
+        <header class="queue-header">
+          <h2 id="queue-heading">
+            FIFO Audio Queue
+            <span class="queue-count-pill" id="queue-count">0 items</span>
+          </h2>
+          <span style="font-size: 0.8rem; color: var(--text-accent); font-family: var(--font-mono);" id="queue-active-indicator">
+            IDLE
+          </span>
+        </header>
+        <p style="font-size: 0.85rem; color: var(--text-muted);">
+          Tasks execute sequentially in strict FIFO order. AbortController cancels network fetch & decoding instantly.
+        </p>
+        <ol class="queue-list" id="fifo-queue-list">
+          <li class="queue-empty-item">Queue is currently empty. Enqueue tracks from the catalog to begin!</li>
+        </ol>
+      </section>
+    </section>
+
+    <!-- Architecture & Verification Guide -->
+    <section class="guide-card" aria-labelledby="guide-heading">
+      <h2 id="guide-heading">Architecture & Verification Checklist (HW 2 Criteria)</h2>
+      <ol>
         <li>
-          <strong>Inspect Elements Tree:</strong> Press <code>F12</code> or <code>Ctrl+Shift+I</code> to open Chrome DevTools. Expand <code>&lt;div id="app"&gt;</code> and confirm the mounted child is <code>&lt;main id="root-view" role="main"&gt;</code> without any unwanted wrapper divs.
+          <strong>FIFO Concurrency Invariant:</strong> Click <em>"Enqueue All 4"</em>. Notice all 4 tasks enter the queue simultaneously, but download and decode strictly sequentially (one at a time) via the <code>isProcessing</code> mutex guard.
         </li>
         <li>
-          <strong>Zero Div-Soup Verification:</strong> Check that all nodes are semantic elements: <code>&lt;main&gt;</code>, <code>&lt;header&gt;</code>, <code>&lt;h1&gt;</code>, <code>&lt;p&gt;</code>, <code>&lt;button&gt;</code>.
+          <strong>AbortController Token Cancellation:</strong> Click <em>"Cancel Download"</em> while a track is downloading. The active task immediately transitions to <code>ABORTED</code> status and the queue immediately proceeds to the next track without deadlock.
         </li>
         <li>
-          <strong>XSS Resistance Checkpoint:</strong> Verify that <code>&lt;p&gt;</code> contains the raw text <code>&lt;img onerror=alert(1)&gt; Safe Text</code> as a harmless text node instead of an active <code>&lt;img&gt;</code> element.
+          <strong>Memory Safety (Zero Leaks):</strong> Observe <code>Active Sources</code> (never exceeds 1) and <code>Sources Cleaned Up</code>. Every time a song finishes or skips, <code>AudioBufferSourceNode.disconnect()</code> is explicitly called to allow garbage collection.
         </li>
         <li>
-          <strong>VNode Memory Parity:</strong> In the DevTools Console, inspect <code>document.getElementById('root-view').__vnode</code> to view the underlying in-memory VNode POJO representation.
+          <strong>60fps Canvas Without State Thrashing:</strong> The visualizer runs in a decoupled <code>requestAnimationFrame</code> loop reading directly from <code>analyser.getByteFrequencyData()</code> without triggering DOM or React re-renders. Check the <code>FPS: 60.0</code> counter.
         </li>
       </ol>
-      <pre><code>// DevTools Console Quick Verification:
-const mainEl = document.getElementById('root-view');
-console.log('DOM node matches VNode:', mainEl.__vnode.type === 'main');
-console.log('Divs inside app:', document.querySelectorAll('#app div').length); // Expect 0
-console.log('Images inside app:', document.querySelectorAll('#app img').length); // Expect 0</code></pre>
     </section>
-  </div>
 
-  <!-- Run verification test suite via ES Module -->
-  <script type="module" src="./test-runner.js"></script>
+    <!-- Footer -->
+    <footer class="app-footer">
+      <p>Lab 02: Modern React Architecture & Web Audio API &bull; Student: <strong>Trần Hữu Thắng (24521614)</strong> &bull; UIT - University of Information Technology</p>
+    </footer>
+  </main>
+
+  <!-- Application Orchestration Script -->
+  <script type="module">
+    import { AudioEngine } from './audio-engine.js';
+    import { AudioTaskQueue } from './audio-queue-controller.js';
+    import { AudioVisualizer } from './visualizer.js';
+    import { generateSyntheticTrackCatalog } from './synthetic-tracks.js';
+
+    // 1. Initialize Subsystems
+    const audioEngine = new AudioEngine({ fftSize: 512 });
+    const audioQueue = new AudioTaskQueue();
+    const canvas = document.getElementById('visualizer-canvas');
+    const visualizer = new AudioVisualizer(canvas, audioEngine);
+    visualizer.start();
+
+    // Generate in-memory synthetic track catalog (100% offline, zero CORS bugs!)
+    const trackCatalog = generateSyntheticTrackCatalog();
+
+    // DOM Elements
+    const hudFps = document.getElementById('hud-fps');
+    const hudDropped = document.getElementById('hud-dropped');
+    const hudActiveSources = document.getElementById('hud-active-sources');
+    const hudCleanedSources = document.getElementById('hud-cleaned-sources');
+    const hudCtxState = document.getElementById('hud-ctx-state');
+    const nowPlayingTitle = document.getElementById('now-playing-title');
+    const nowPlayingArtist = document.getElementById('now-playing-artist');
+    const playbackTimeDisplay = document.getElementById('playback-time-display');
+    const btnPlayPause = document.getElementById('btn-play-pause');
+    const btnStop = document.getElementById('btn-stop');
+    const btnNext = document.getElementById('btn-next');
+    const btnCancelCurrent = document.getElementById('btn-cancel-current');
+    const btnClearQueue = document.getElementById('btn-clear-queue');
+    const volumeSlider = document.getElementById('volume-slider');
+    const volumeReadout = document.getElementById('volume-readout');
+    const fftSelect = document.getElementById('fft-size-select');
+    const fifoQueueList = document.getElementById('fifo-queue-list');
+    const queueCountBadge = document.getElementById('queue-count');
+    const queueActiveIndicator = document.getElementById('queue-active-indicator');
+    const liveAnnouncer = document.getElementById('audio-live-status');
+
+    // Currently playing track metadata
+    let currentTrack = null;
+    let decodedBufferQueue = [];
+
+    // Helper: Announce for Screen Readers
+    function announce(msg) {
+      if (liveAnnouncer) {
+        liveAnnouncer.textContent = msg;
+      }
+    }
+
+    // Helper: Format seconds to M:SS
+    function formatTime(sec) {
+      if (isNaN(sec) || sec <= 0) return '0:00';
+      const m = Math.floor(sec / 60);
+      const s = Math.floor(sec % 60);
+      return `${m}:${s < 10 ? '0' : ''}${s}`;
+    }
+
+    // Connect AudioContext to Queue upon user interaction
+    async function ensureEngineReady() {
+      await audioEngine.ensureContext();
+      audioQueue.setAudioContext(audioEngine.ctx);
+      if (hudCtxState && audioEngine.ctx) {
+        hudCtxState.textContent = audioEngine.ctx.state.toUpperCase();
+      }
+    }
+
+    // Render Synthetic Catalog List
+    const catalogUl = document.getElementById('synthetic-catalog-list');
+    trackCatalog.forEach((track) => {
+      const li = document.createElement('li');
+      li.className = 'catalog-item';
+
+      const info = document.createElement('section');
+      info.className = 'catalog-info';
+      const strong = document.createElement('strong');
+      strong.textContent = track.title;
+      const span = document.createElement('span');
+      span.textContent = `${track.artist} (${track.duration}s)`;
+      info.appendChild(strong);
+      info.appendChild(span);
+
+      const btn = document.createElement('button');
+      btn.type = 'button';
+      btn.className = 'enqueue-btn';
+      btn.textContent = '+ Enqueue';
+      btn.setAttribute('aria-label', `Enqueue ${track.title}`);
+      btn.addEventListener('click', async () => {
+        await ensureEngineReady();
+        enqueueTrack(track.blobUrl, track.title, track.artist, track.duration);
+      });
+
+      li.appendChild(info);
+      li.appendChild(btn);
+      catalogUl.appendChild(li);
+    });
+
+    // Enqueue a track into the FIFO Queue
+    function enqueueTrack(url, title, artist, duration) {
+      announce(`Enqueued ${title}`);
+      audioQueue.enqueue(url, { title, artist, duration })
+        .then((audioBuffer) => {
+          decodedBufferQueue.push({ audioBuffer, title, artist, duration });
+          announce(`Track ready: ${title}`);
+          // If no track is currently playing, start playing immediately!
+          if (!audioEngine.isPlaying && !audioEngine.isPaused) {
+            playNextDecodedTrack();
+          }
+        })
+        .catch((err) => {
+          if (err.name === 'AbortError') {
+            announce(`Cancelled track: ${title}`);
+          } else {
+            announce(`Error loading track: ${title}`);
+          }
+        });
+    }
+
+    // Play next decoded track in player playlist
+    function playNextDecodedTrack() {
+      if (decodedBufferQueue.length === 0) {
+        currentTrack = null;
+        audioEngine.stop();
+        nowPlayingTitle.textContent = 'Queue Finished';
+        nowPlayingArtist.textContent = 'All enqueued tracks have completed playback';
+        btnPlayPause.textContent = '▶ Play';
+        announce('Playback finished');
+        return;
+      }
+
+      currentTrack = decodedBufferQueue.shift();
+      nowPlayingTitle.textContent = currentTrack.title;
+      nowPlayingArtist.textContent = currentTrack.artist;
+      btnPlayPause.textContent = '⏸ Pause';
+      announce(`Now playing: ${currentTrack.title}`);
+
+      audioEngine.playBuffer(currentTrack.audioBuffer, () => {
+        // Natural track finish: advance to next
+        playNextDecodedTrack();
+      });
+    }
+
+    // Reactive Queue UI Synchronizer
+    audioQueue.subscribe(({ queue, activeTask, isProcessing }) => {
+      // Clear queue list
+      fifoQueueList.replaceChildren();
+
+      const totalItems = queue.length + (activeTask ? 1 : 0);
+      queueCountBadge.textContent = `${totalItems} items`;
+      queueActiveIndicator.textContent = activeTask ? activeTask.status : 'IDLE';
+
+      if (!activeTask && queue.length === 0) {
+        const emptyLi = document.createElement('li');
+        emptyLi.className = 'queue-empty-item';
+        emptyLi.textContent = 'Queue is currently empty. Enqueue tracks from the catalog above!';
+        fifoQueueList.appendChild(emptyLi);
+        return;
+      }
+
+      // Render Active Task if present
+      if (activeTask) {
+        const li = createQueueItemElement(activeTask, 1, true);
+        fifoQueueList.appendChild(li);
+      }
+
+      // Render Pending Tasks in strict FIFO sequence
+      queue.forEach((task, idx) => {
+        const orderNum = (activeTask ? 2 : 1) + idx;
+        const li = createQueueItemElement(task, orderNum, false);
+        fifoQueueList.appendChild(li);
+      });
+    });
+
+    function createQueueItemElement(task, orderNumber, isActive) {
+      const li = document.createElement('li');
+      li.className = `queue-item ${isActive ? `item-active item-${task.status.toLowerCase()}` : ''}`;
+
+      const mainInfo = document.createElement('section');
+      mainInfo.className = 'task-main-info';
+
+      const orderBadge = document.createElement('span');
+      orderBadge.className = 'task-order-badge';
+      orderBadge.textContent = `#${orderNumber}`;
+
+      const titleWrap = document.createElement('section');
+      titleWrap.className = 'task-title-wrap';
+      const strong = document.createElement('strong');
+      strong.textContent = task.title;
+      const span = document.createElement('span');
+      span.textContent = task.artist || 'Procedural Track';
+      titleWrap.appendChild(strong);
+      titleWrap.appendChild(span);
+
+      mainInfo.appendChild(orderBadge);
+      mainInfo.appendChild(titleWrap);
+
+      const actionWrap = document.createElement('section');
+      actionWrap.style.display = 'flex';
+      actionWrap.style.alignItems = 'center';
+      actionWrap.style.gap = '0.5rem';
+
+      const statusBadge = document.createElement('span');
+      statusBadge.className = `status-badge status-${task.status.toLowerCase()}`;
+      statusBadge.textContent = task.status;
+
+      actionWrap.appendChild(statusBadge);
+
+      // Cancel button
+      if (task.status === 'PENDING' || task.status === 'DOWNLOADING' || task.status === 'DECODING') {
+        const cancelBtn = document.createElement('button');
+        cancelBtn.type = 'button';
+        cancelBtn.className = 'cancel-task-btn';
+        cancelBtn.textContent = '✕ Cancel';
+        cancelBtn.setAttribute('aria-label', `Cancel ${task.title}`);
+        cancelBtn.addEventListener('click', () => {
+          audioQueue.cancelTask(task.id);
+        });
+        actionWrap.appendChild(cancelBtn);
+      }
+
+      li.appendChild(mainInfo);
+      li.appendChild(actionWrap);
+      return li;
+    }
+
+    // Playback Progress & Time Update Listener
+    audioEngine.onPlaybackChange(({ isPlaying, isPaused, currentTime, duration }) => {
+      playbackTimeDisplay.textContent = `${formatTime(currentTime)} / ${formatTime(duration)}`;
+      if (isPlaying) {
+        btnPlayPause.textContent = '⏸ Pause';
+      } else if (isPaused) {
+        btnPlayPause.textContent = '▶ Resume';
+      } else {
+        btnPlayPause.textContent = '▶ Play';
+      }
+    });
+
+    // Transport Controls Event Listeners
+    btnPlayPause.addEventListener('click', async () => {
+      await ensureEngineReady();
+      if (audioEngine.isPlaying) {
+        audioEngine.pause();
+      } else if (audioEngine.isPaused) {
+        audioEngine.resume(() => playNextDecodedTrack());
+      } else {
+        if (decodedBufferQueue.length > 0) {
+          playNextDecodedTrack();
+        } else if (trackCatalog.length > 0) {
+          // Auto-enqueue track 1 if nothing queued
+          const t = trackCatalog[0];
+          enqueueTrack(t.blobUrl, t.title, t.artist, t.duration);
+        }
+      }
+    });
+
+    btnStop.addEventListener('click', () => {
+      audioEngine.stop();
+      announce('Playback stopped');
+    });
+
+    btnNext.addEventListener('click', async () => {
+      await ensureEngineReady();
+      announce('Skipping to next track');
+      audioEngine.stop();
+      playNextDecodedTrack();
+    });
+
+    btnCancelCurrent.addEventListener('click', () => {
+      audioQueue.cancelCurrent();
+      announce('Cancelled active download');
+    });
+
+    btnClearQueue.addEventListener('click', () => {
+      audioQueue.clearQueue();
+      decodedBufferQueue = [];
+      announce('Cleared queue');
+    });
+
+    volumeSlider.addEventListener('input', (e) => {
+      const vol = Number(e.target.value);
+      audioEngine.setVolume(vol);
+      volumeReadout.textContent = `${Math.round(vol * 100)}%`;
+    });
+
+    fftSelect.addEventListener('change', (e) => {
+      const size = Number(e.target.value);
+      audioEngine.setFftSize(size);
+      announce(`FFT size set to ${size} bins`);
+    });
+
+    // Enqueue All 4 button
+    document.getElementById('btn-enqueue-all').addEventListener('click', async () => {
+      await ensureEngineReady();
+      trackCatalog.forEach((t) => {
+        enqueueTrack(t.blobUrl, t.title, t.artist, t.duration);
+      });
+      announce('Enqueued all 4 tracks for concurrent FIFO test');
+    });
+
+    // Custom File Upload Input
+    document.getElementById('custom-file-input').addEventListener('change', async (e) => {
+      const file = e.target.files[0];
+      if (!file) return;
+      await ensureEngineReady();
+      const blobUrl = URL.createObjectURL(file);
+      const name = file.name.replace(/\.[^/.]+$/, "");
+      enqueueTrack(blobUrl, name, 'Local User Audio', 0);
+    });
+
+    // Visualizer Mode Buttons
+    const modeBtns = {
+      bars: document.getElementById('btn-mode-bars'),
+      waveform: document.getElementById('btn-mode-waveform'),
+      radial: document.getElementById('btn-mode-radial')
+    };
+
+    Object.entries(modeBtns).forEach(([mode, btn]) => {
+      btn.addEventListener('click', () => {
+        Object.values(modeBtns).forEach((b) => b.classList.remove('active-mode'));
+        btn.classList.add('active-mode');
+        visualizer.setMode(mode);
+        announce(`Visualizer set to ${mode} mode`);
+      });
+    });
+
+    // Telemetry HUD Refresh Interval (Decoupled 2Hz telemetry update)
+    setInterval(() => {
+      if (hudFps) {
+        const fpsVal = visualizer.fps.toFixed(1);
+        hudFps.textContent = fpsVal;
+        hudFps.className = visualizer.fps >= 50 ? 'hud-val fps-good' : 'hud-val fps-warn';
+      }
+      if (hudDropped) hudDropped.textContent = visualizer.droppedFrames;
+      if (hudActiveSources) hudActiveSources.textContent = audioEngine.metrics.activeSources;
+      if (hudCleanedSources) hudCleanedSources.textContent = audioEngine.metrics.sourcesCleanedUp;
+      if (hudCtxState && audioEngine.ctx) {
+        hudCtxState.textContent = audioEngine.ctx.state.toUpperCase();
+      }
+    }, 500);
+
+    // Expose subsystems for live DevTools debugging
+    window.__audioStudio = {
+      engine: audioEngine,
+      queue: audioQueue,
+      visualizer: visualizer,
+      catalog: trackCatalog
+    };
+  </script>
 </body>
 </html>

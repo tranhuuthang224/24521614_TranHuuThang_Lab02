@@ -1,18 +1,19 @@
 {
-  "name": "mini-react-lab02",
+  "name": "audio-visualizer-lab02",
   "version": "1.0.0",
-  "description": "Mini-React Virtual DOM & Mounting Engine - Lab 02 UIT",
+  "description": "Concurrent FIFO Audio Visualizer Queue Engine - Lab 02 UIT HW 2",
   "type": "module",
-  "main": "mini-react.js",
+  "main": "audio-queue-controller.js",
   "scripts": {
-    "test": "node --test test.js",
+    "test": "node --test test-audio-queue.js",
     "start": "npx serve ."
   },
   "keywords": [
-    "virtual-dom",
-    "react",
-    "vnode",
-    "mounting-engine",
+    "web-audio-api",
+    "audio-visualizer",
+    "fifo-queue",
+    "concurrency",
+    "abort-controller",
     "uit"
   ],
   "author": "Tran Huu Thang",
