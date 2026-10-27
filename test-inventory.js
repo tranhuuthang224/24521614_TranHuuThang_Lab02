@@ -121,10 +121,11 @@ test('Scenario 5: Releasing same lock twice does not increment stock twice (idem
   manager.destroy();
 });
 
-test('Scenario 6: Checking out same lock twice does not sell twice (double-spend guard)', async () => {
+test('Scenario 6: Checking out same lock twice (even after original expiresAt has passed) does not sell or release twice', async () => {
   const manager = new OptimisticInventoryLockManager(SAMPLE_PRODUCTS);
 
-  const lockRes = await manager.requestLock('prod-mac', 'user-double-checkout', 20000);
+  // Short 30ms lease
+  const lockRes = await manager.requestLock('prod-mac', 'user-double-checkout', 30);
   assert.equal(lockRes.status, 'LOCKED');
 
   // First checkout: succeeds
@@ -135,15 +136,20 @@ test('Scenario 6: Checking out same lock twice does not sell twice (double-spend
   const prodMid = manager.getProduct('prod-mac');
   assert.equal(prodMid.soldStock, 1);
   assert.equal(prodMid.lockedStock, 0);
+  assert.equal(prodMid.availableStock, 1);
 
-  // Second checkout: must be rejected with invalid state
+  // Wait 40ms so that Date.now() > lock.expiresAt
+  await new Promise((r) => setTimeout(r, 40));
+
+  // Second checkout: MUST be rejected with INVALID_STATE_PURCHASED, NOT trigger _releaseExpiredLock
   const secondCheckout = await manager.confirmCheckout(lockRes.lockId);
   assert.equal(secondCheckout.success, false);
   assert.equal(secondCheckout.reason, 'INVALID_STATE_PURCHASED');
 
   const prodFinal = manager.getProduct('prod-mac');
   assert.equal(prodFinal.soldStock, 1, 'Double spend occurred: soldStock incremented twice!');
-  assert.equal(prodFinal.lockedStock, 0);
+  assert.equal(prodFinal.lockedStock, 0, 'lockedStock corrupted by duplicate checkout!');
+  assert.equal(prodFinal.availableStock, 1, 'availableStock leaked by duplicate checkout after expiry!');
 
   manager.destroy();
 });
@@ -264,4 +270,124 @@ test('Scenario 10: resetInventory restores all products to baseline and invalida
 
   manager.destroy();
 });
+
+test('Scenario 11: Checkout after lock lease expired is rejected and restores stock exactly once', async () => {
+  const manager = new OptimisticInventoryLockManager(SAMPLE_PRODUCTS);
+
+  const lockRes = await manager.requestLock('prod-iphone', 'user-late-buyer', 30);
+  assert.equal(lockRes.status, 'LOCKED');
+  assert.equal(manager.getProduct('prod-iphone').availableStock, 2);
+  assert.equal(manager.getProduct('prod-iphone').lockedStock, 1);
+
+  // Wait 45ms so lease expires
+  await new Promise((r) => setTimeout(r, 45));
+
+  // First attempt after expiry: rejected with LOCK_EXPIRED and restores stock
+  const lateCheckout1 = await manager.confirmCheckout(lockRes.lockId);
+  assert.equal(lateCheckout1.success, false);
+  assert.equal(lateCheckout1.reason, 'LOCK_EXPIRED');
+
+  const iphoneMid = manager.getProduct('prod-iphone');
+  assert.equal(iphoneMid.availableStock, 3);
+  assert.equal(iphoneMid.lockedStock, 0);
+
+  // Second attempt: rejected with INVALID_STATE_EXPIRED and does NOT increment stock again
+  const lateCheckout2 = await manager.confirmCheckout(lockRes.lockId);
+  assert.equal(lateCheckout2.success, false);
+  assert.equal(lateCheckout2.reason, 'INVALID_STATE_EXPIRED');
+
+  const iphoneFinal = manager.getProduct('prod-iphone');
+  assert.equal(iphoneFinal.availableStock, 3);
+  assert.equal(iphoneFinal.lockedStock, 0);
+  assert.equal(iphoneFinal.soldStock, 0);
+
+  manager.destroy();
+});
+
+test('Scenario 12: resetInventory while checkout is in-flight aborts checkout cleanly without corrupting inventory', async () => {
+  const manager = new OptimisticInventoryLockManager(SAMPLE_PRODUCTS);
+
+  const lockRes = await manager.requestLock('prod-sony', 'user-race-reset', 30000);
+  assert.equal(lockRes.status, 'LOCKED');
+
+  // Start checkout (which has 20ms simulated network latency)
+  const checkoutPromise = manager.confirmCheckout(lockRes.lockId);
+
+  // Immediately (5ms) reset the store while checkout is still awaiting payment gateway
+  await new Promise((r) => setTimeout(r, 5));
+  manager.resetInventory(SAMPLE_PRODUCTS);
+
+  // Await the checkout promise
+  const checkoutRes = await checkoutPromise;
+  assert.equal(checkoutRes.success, false);
+  assert.equal(checkoutRes.reason, 'TRANSACTION_ABORTED_RESET');
+
+  // Verify store remains 100% pristine and conservation holds
+  const sony = manager.getProduct('prod-sony');
+  assert.equal(sony.availableStock, 5);
+  assert.equal(sony.lockedStock, 0);
+  assert.equal(sony.soldStock, 0);
+
+  const report = verifyStorewideConservation(manager);
+  assert.equal(report.valid, true);
+
+  manager.destroy();
+});
+
+test('Scenario 13: Reset after high-concurrency bot burst restores all products and voids previous locks', async () => {
+  const manager = new OptimisticInventoryLockManager(SAMPLE_PRODUCTS);
+
+  // Burst on prod-iphone (totalStock = 3) with 50 bots
+  const burst = await simulateFlashCrowdBurst(manager, 'prod-iphone', 50, 10);
+  assert.equal(burst.acquiredCount, 3);
+  assert.equal(burst.rejectedCount, 47);
+
+  const prodMid = manager.getProduct('prod-iphone');
+  assert.equal(prodMid.availableStock, 0);
+  assert.equal(prodMid.lockedStock, 3);
+
+  // Reset store
+  manager.resetInventory(SAMPLE_PRODUCTS);
+
+  // Products returned to baseline
+  const prodAfter = manager.getProduct('prod-iphone');
+  assert.equal(prodAfter.availableStock, 3);
+  assert.equal(prodAfter.lockedStock, 0);
+  assert.equal(prodAfter.soldStock, 0);
+
+  // Old locks are voided and locks map is cleared
+  assert.equal(manager.locks.size, 0);
+
+  manager.destroy();
+});
+
+test('Scenario 14: Input validation for leaseDurationMs and catalog validation on reset', async () => {
+  const manager = new OptimisticInventoryLockManager(SAMPLE_PRODUCTS);
+
+  // leaseDurationMs validation
+  await assert.rejects(
+    async () => manager.requestLock('prod-iphone', 'u1', 0),
+    RangeError
+  );
+  await assert.rejects(
+    async () => manager.requestLock('prod-iphone', 'u1', -100),
+    RangeError
+  );
+  await assert.rejects(
+    async () => manager.requestLock('prod-iphone', 'u1', NaN),
+    RangeError
+  );
+
+  // Catalog validation on reset (must not alter existing inventory on failure)
+  assert.throws(() => manager.resetInventory([]), TypeError);
+  assert.throws(() => manager.resetInventory('not-an-array'), TypeError);
+  assert.throws(() => manager.resetInventory([{ id: 'bad-stock', totalStock: -5 }]), TypeError);
+
+  // Existing inventory remains completely untouched
+  const iphone = manager.getProduct('prod-iphone');
+  assert.equal(iphone.availableStock, 3);
+
+  manager.destroy();
+});
+
 

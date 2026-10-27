@@ -51,6 +51,8 @@ export class OptimisticInventoryLockManager {
     this.locks = new Map();
     /** @type {Set<(event: { type: string, product?: ProductInventory, lock?: LockRecord }) => void>} */
     this.subscribers = new Set();
+    /** Epoch sequence counter to invalidate in-flight async checkouts across resets */
+    this.epoch = 0;
 
     initialProducts.forEach((p) => {
       this.products.set(p.id, {
@@ -105,6 +107,10 @@ export class OptimisticInventoryLockManager {
    * @returns {Promise<{ success: boolean, lock?: LockRecord, reason?: string }>}
    */
   async requestLock(productId, userId, leaseDurationMs = 30000) {
+    if (!Number.isFinite(leaseDurationMs) || leaseDurationMs <= 0) {
+      throw new RangeError('leaseDurationMs must be a positive finite number');
+    }
+
     const product = this.products.get(productId);
     if (!product) {
       return { success: false, status: 'PRODUCT_NOT_FOUND', reason: 'PRODUCT_NOT_FOUND' };
@@ -173,21 +179,36 @@ export class OptimisticInventoryLockManager {
       return { success: false, reason: 'PRODUCT_NOT_FOUND' };
     }
 
-    // Lease expiry guard
-    if (Date.now() > lock.expiresAt) {
+    // 1. MUST verify status FIRST: Only 'LOCKED' records can ever checkout!
+    // Prevents running _releaseExpiredLock on already PURCHASED/RELEASED locks.
+    if (lock.status !== 'LOCKED') {
+      return { success: false, reason: `INVALID_STATE_${lock.status}` };
+    }
+
+    // 2. Lease expiry guard: Only release if record was actively 'LOCKED'
+    if (Date.now() >= lock.expiresAt) {
       this._releaseExpiredLock(lock, product);
       return { success: false, reason: 'LOCK_EXPIRED' };
     }
 
-    if (lock.status !== 'LOCKED') {
-      return { success: false, reason: `INVALID_STATE_${lock.status}` };
-    }
+    // Capture current epoch to detect if reset occurs during async gateway latency
+    const checkoutEpoch = this.epoch;
 
     lock.status = 'CHECKING_OUT';
     this._notify('CHECKOUT_STARTED', product, lock);
 
     // Simulate transient payment network gateway latency (15ms - 50ms)
     await new Promise((r) => setTimeout(r, 20));
+
+    // 3. Post-await verification: verify transaction was not aborted by a store reset
+    if (
+      this.epoch !== checkoutEpoch ||
+      lock.status !== 'CHECKING_OUT' ||
+      this.locks.get(lockId) !== lock ||
+      !this.products.has(lock.productId)
+    ) {
+      return { success: false, reason: 'TRANSACTION_ABORTED_RESET' };
+    }
 
     // Finalize purchase
     product.lockedStock -= 1;
@@ -243,6 +264,7 @@ export class OptimisticInventoryLockManager {
   }
 
   _releaseExpiredLock(lock, product) {
+    if (lock.status !== 'LOCKED') return;
     product.lockedStock -= 1;
     product.availableStock += 1;
     lock.status = 'EXPIRED';
@@ -259,6 +281,26 @@ export class OptimisticInventoryLockManager {
    * @param {ProductInventory[]} [initialCatalog]
    */
   resetInventory(initialCatalog) {
+    const catalog = initialCatalog || Array.from(this.products.values());
+    if (!Array.isArray(catalog) || catalog.length === 0) {
+      throw new TypeError('initialCatalog must be a non-empty array of products');
+    }
+
+    // Validate catalog definitions BEFORE mutating any state
+    for (const p of catalog) {
+      if (
+        !p ||
+        typeof p.id !== 'string' ||
+        !Number.isSafeInteger(p.totalStock) ||
+        p.totalStock < 0
+      ) {
+        throw new TypeError(`Invalid product definition in catalog: ${JSON.stringify(p)}`);
+      }
+    }
+
+    // Advance epoch to invalidate any in-flight async checkouts
+    this.epoch += 1;
+
     // 1. Invalidate and transition all existing active locks
     for (const lock of this.locks.values()) {
       if (lock.status === 'LOCKED' || lock.status === 'CHECKING_OUT') {
@@ -268,7 +310,7 @@ export class OptimisticInventoryLockManager {
     this.locks.clear();
 
     // 2. Reset or re-populate product inventory baseline
-    const catalog = initialCatalog || Array.from(this.products.values());
+    this.products.clear();
     catalog.forEach((p) => {
       const total = p.totalStock;
       const product = {

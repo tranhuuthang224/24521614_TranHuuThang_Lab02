@@ -415,7 +415,11 @@
 
         const ip16 = lockManager.getProduct('sp-ip16pm');
         logConsole(`TỒN KHO HIỆN TẠI: Còn: ${ip16.availableStock} | Đang giữ: ${ip16.lockedStock} | Đã bán: ${ip16.soldStock} (Tổng: ${ip16.totalStock})`);
-        logConsole('XÁC NHẬN: ZERO OVERSELLING (100% Không bán vượt kho!)');
+        if (!result.oversold && result.conservationValid) {
+          logConsole('XÁC NHẬN: ZERO OVERSELLING (100% Không bán vượt kho, bảo toàn toán học hoàn hảo!)');
+        } else {
+          logConsole(`CẢNH BÁO: Phát hiện vi phạm tính toán! (oversold=${result.oversold}, conservationValid=${result.conservationValid})`);
+        }
         announce(`Hoàn thành 50 bot burst: ${result.acquiredCount} thành công, ${result.rejectedCount} bị từ chối.`);
       } catch (err) {
         logConsole(`Lỗi khi chạy simulator: ${err.message}`);
