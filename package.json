@@ -1,20 +1,24 @@
 {
-  "name": "mini-react-lab02",
+  "name": "vietnam-megasale-1111-lab02",
   "version": "1.0.0",
-  "description": "Mini-React Virtual DOM & Mounting Engine - Lab 02 UIT",
+  "description": "Vietnam Mega-Sale 11.11 Flash Deal & Optimistic Inventory Lock FSM - Lab 02 UIT HW 3",
   "type": "module",
-  "main": "mini-react.js",
+  "main": "anti-drift-timer.js",
   "scripts": {
-    "test": "node --test test.js",
+    "test": "node --test test-timer.js test-inventory.js",
+    "test:timer": "node --test test-timer.js",
+    "test:inventory": "node --test test-inventory.js",
     "start": "npx serve ."
   },
   "keywords": [
-    "virtual-dom",
-    "react",
-    "vnode",
-    "mounting-engine",
+    "anti-drift-timer",
+    "optimistic-inventory-lock",
+    "shopee-1111",
+    "flash-sale",
+    "fsm",
+    "zero-div-soup",
     "uit"
   ],
-  "author": "Tran Huu Thang",
+  "author": "Tran Huu Thang (24521614)",
   "license": "MIT"
 }
