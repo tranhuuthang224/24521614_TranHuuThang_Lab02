@@ -297,3 +297,57 @@ test('Task 2.4: FFT Size configuration and range bounds', () => {
   assert.throws(() => engine.setFftSize(1024), RangeError);
   assert.throws(() => engine.setFftSize(128), RangeError);
 });
+
+test('Task 2.5: Anti-click fade-in/out and WAV encoding integrity', async () => {
+  const { encodeWAV } = await import('./synthetic-tracks.js');
+  const sampleRate = 44100;
+  const numSamples = 4410; // 0.1s
+  const channel = new Float32Array(numSamples);
+  channel.fill(0.8); // Square wave step that would pop without de-clicking
+
+  const blob = encodeWAV([channel], sampleRate);
+  assert.equal(blob.type, 'audio/wav');
+  assert.equal(blob.size, 44 + numSamples * 2);
+
+  // Verify de-clicking fade-in: sample 0 must be 0
+  assert.equal(channel[0], 0, 'Fade-in envelope failed: first sample must be 0');
+  // Verify de-clicking fade-out: last sample must be 0
+  assert.equal(channel[numSamples - 1], 0, 'Fade-out envelope failed: last sample must be 0');
+});
+
+test('Task 2.6: AudioVisualizer buffer dimensions - freqData (256) vs timeData (512)', async () => {
+  const { AudioVisualizer } = await import('./visualizer.js');
+  const mockCanvas = {
+    getContext: () => ({
+      createLinearGradient: () => ({ addColorStop: () => {} }),
+      setTransform: () => {},
+      clearRect: () => {},
+      fillRect: () => {},
+      strokeRect: () => {},
+      beginPath: () => {},
+      moveTo: () => {},
+      lineTo: () => {},
+      stroke: () => {},
+      fillText: () => {},
+      save: () => {},
+      restore: () => {},
+      arc: () => {},
+      translate: () => {}
+    }),
+    getBoundingClientRect: () => ({ width: 800, height: 320 })
+  };
+
+  const mockCtx = new MockAudioContext();
+  const engine = new AudioEngine({ fftSize: 512 });
+  engine.ctx = mockCtx;
+  engine.analyser = mockCtx.createAnalyser();
+  engine.setFftSize(512);
+
+  const visualizer = new AudioVisualizer(mockCanvas, engine);
+
+  // Invariant Bug 1 Fix Verification:
+  // freqData must match frequencyBinCount = 256
+  // timeData must match fftSize = 512
+  assert.equal(visualizer.freqData.length, 256, 'freqData length must be 256 (frequencyBinCount)');
+  assert.equal(visualizer.timeData.length, 512, 'timeData length must be 512 (fftSize)');
+});

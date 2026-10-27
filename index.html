@@ -180,24 +180,40 @@
     import { AudioEngine } from './audio-engine.js';
     import { AudioTaskQueue } from './audio-queue-controller.js';
     import { AudioVisualizer } from './visualizer.js';
-    import { generateSyntheticTrackCatalog } from './synthetic-tracks.js';
+    import { generateSyntheticTrackCatalog, revokeAllSyntheticUrls } from './synthetic-tracks.js';
 
     // 1. Initialize Subsystems
     const audioEngine = new AudioEngine({ fftSize: 512 });
     const audioQueue = new AudioTaskQueue();
     const canvas = document.getElementById('visualizer-canvas');
-    const visualizer = new AudioVisualizer(canvas, audioEngine);
-    visualizer.start();
-
-    // Generate in-memory synthetic track catalog (100% offline, zero CORS bugs!)
-    const trackCatalog = generateSyntheticTrackCatalog();
-
-    // DOM Elements
+    
+    // DOM Elements for Telemetry
     const hudFps = document.getElementById('hud-fps');
     const hudDropped = document.getElementById('hud-dropped');
     const hudActiveSources = document.getElementById('hud-active-sources');
     const hudCleanedSources = document.getElementById('hud-cleaned-sources');
     const hudCtxState = document.getElementById('hud-ctx-state');
+
+    // Visualizer instance with direct telemetry callback (Caps at 60 FPS, Zero State Thrashing!)
+    const visualizer = new AudioVisualizer(canvas, audioEngine, {
+      targetFps: 60,
+      onFpsUpdate: (fps, dropped) => {
+        if (hudFps) {
+          hudFps.textContent = fps.toFixed(1);
+          hudFps.className = fps >= 50 ? 'hud-val fps-good' : 'hud-val fps-warn';
+        }
+        if (hudDropped) hudDropped.textContent = dropped;
+      }
+    });
+    visualizer.start();
+
+    // Revoke all in-memory Blob URLs on page unload to prevent memory leaks
+    window.addEventListener('beforeunload', () => {
+      revokeAllSyntheticUrls();
+    });
+
+    // Generate in-memory synthetic track catalog (100% offline, zero CORS bugs!)
+    const trackCatalog = generateSyntheticTrackCatalog();
     const nowPlayingTitle = document.getElementById('now-playing-title');
     const nowPlayingArtist = document.getElementById('now-playing-artist');
     const playbackTimeDisplay = document.getElementById('playback-time-display');
