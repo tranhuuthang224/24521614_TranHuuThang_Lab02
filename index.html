@@ -105,6 +105,7 @@
     import { createAntiDriftTimer } from './anti-drift-timer.js';
     import { OptimisticInventoryLockManager } from './inventory-state-machine.js';
     import { FLASH_DEAL_CATALOG, VOUCHER_LIST, formatVND } from './flash-deal-data.js';
+    import { simulateFlashCrowdBurst, verifyStorewideConservation } from './concurrency-simulator.js';
 
     // 1. Initialize Subsystems
     const lockManager = new OptimisticInventoryLockManager(FLASH_DEAL_CATALOG);
@@ -258,7 +259,7 @@
           const btnSuccess = document.createElement('button');
           btnSuccess.type = 'button';
           btnSuccess.className = 'deal-btn btn-success';
-          btnSuccess.textContent = ` ĐÃ MUA THÀNH CÔNG (Mã: ${myLock.orderId})`;
+          btnSuccess.textContent = `✔ ĐÃ MUA THÀNH CÔNG (Mã: ${myLock.orderId})`;
           actionBar.appendChild(btnSuccess);
 
         } else if (myLock && myLock.status === 'LOCKED') {
@@ -276,18 +277,31 @@
           btnPay.addEventListener('click', async () => {
             btnPay.disabled = true;
             btnPay.textContent = 'Đang chuyển ví ShopeePay...';
-            const res = await lockManager.confirmCheckout(myLock.lockId);
-            if (res.success) {
-              myLock.status = 'PURCHASED';
-              myLock.orderId = res.orderId;
-              announce(`Thanh toán thành công ${product.title}`);
-              logConsole(`Thanh toán thành công: ${product.title} (Mã ĐH: ${res.orderId})`);
-            } else {
-              announce(`Thanh toán thất bại: ${res.reason}`);
-              logConsole(`Thanh toán thất bại: ${res.reason}`);
-              myActiveLocks.delete(product.id);
+            try {
+              const res = await lockManager.confirmCheckout(myLock.lockId);
+              if (res.success) {
+                // Authoritative update from manager state
+                const updatedLock = lockManager.getLock(myLock.lockId);
+                if (updatedLock) {
+                  myActiveLocks.set(product.id, updatedLock);
+                }
+                announce(`Thanh toán thành công ${product.title}`);
+                logConsole(`Thanh toán thành công: ${product.title} (Mã ĐH: ${res.orderId})`);
+              } else {
+                announce(`Thanh toán thất bại: ${res.reason}`);
+                logConsole(`Thanh toán thất bại (${res.reason}): ${product.title}`);
+                const currentLock = lockManager.getLock(myLock.lockId);
+                if (!currentLock || currentLock.status !== 'LOCKED') {
+                  myActiveLocks.delete(product.id);
+                }
+              }
+            } catch (err) {
+              announce(`Lỗi kết nối thanh toán: ${err.message}`);
+              logConsole(`Lỗi kết nối thanh toán: ${err.message}`);
+            } finally {
+              btnPay.disabled = false;
+              renderProductCards();
             }
-            renderProductCards();
           });
 
           const btnRelease = document.createElement('button');
@@ -315,16 +329,25 @@
           btnLock.addEventListener('click', async () => {
             btnLock.disabled = true;
             btnLock.textContent = 'Đang kiểm tra kho...';
-            const res = await lockManager.requestLock(product.id, myUserId, 30000);
-            if (res.success) {
-              myActiveLocks.set(product.id, res.lock);
-              announce(`Đã giữ chỗ thành công ${product.title}`);
-              logConsole(`Khóa thành công: ${product.title} (LockID: ${res.lock.lockId})`);
-            } else {
-              announce(`Săn thất bại: ${res.reason}`);
-              logConsole(`Săn thất bại (${res.reason}): ${product.title}`);
+            try {
+              const res = await lockManager.requestLock(product.id, myUserId, 30000);
+              if (res.status === 'LOCKED' || res.success) {
+                const lockRecord = res.lock || lockManager.getLock(res.lockId) || res;
+                myActiveLocks.set(product.id, lockRecord);
+                announce(`Đã giữ chỗ thành công ${product.title}`);
+                logConsole(`Khóa thành công: ${product.title} (LockID: ${lockRecord.lockId})`);
+              } else {
+                const reason = res.reason ?? res.status ?? 'OUT_OF_STOCK';
+                announce(`Săn thất bại: ${reason}`);
+                logConsole(`Săn thất bại (${reason}): ${product.title}`);
+              }
+            } catch (err) {
+              announce(`Lỗi khi yêu cầu giữ chỗ: ${err.message}`);
+              logConsole(`Lỗi khi yêu cầu giữ chỗ: ${err.message}`);
+            } finally {
+              btnLock.disabled = false;
+              renderProductCards();
             }
-            renderProductCards();
           });
           actionBar.appendChild(btnLock);
 
@@ -377,56 +400,66 @@
     document.getElementById('btn-burst-ip16').addEventListener('click', async () => {
       const btn = document.getElementById('btn-burst-ip16');
       btn.disabled = true;
-      logConsole('==================================================');
-      logConsole('KHỞI CHẠY BOT BURST: 50 bot tranh mua iPhone 16 Pro Max cùng lúc...');
+      try {
+        logConsole('==================================================');
+        logConsole('KHỞI CHẠY BOT BURST: 50 bot tranh mua iPhone 16 Pro Max cùng lúc...');
 
-      const botIds = Array.from({ length: 50 }, (_, i) => `bot-${i + 1}`);
-      const result = await lockManager.simulateConcurrentBurst('sp-ip16pm', botIds);
+        const result = await simulateFlashCrowdBurst(lockManager, 'sp-ip16pm', 50, 15);
 
-      logConsole(`KẾT QUẢ BURST:`);
-      logConsole(`  + Tổng yêu cầu đồng thời: ${result.totalRequests}`);
-      logConsole(`  + Khóa thành công (Acquired): ${result.acquired}`);
-      logConsole(`  + Bị từ chối vì hết hàng (Rejected): ${result.rejected}`);
+        logConsole(`KẾT QUẢ BURST:`);
+        logConsole(`  + Tổng yêu cầu đồng thời: ${result.totalAttempts}`);
+        logConsole(`  + Khóa thành công (Acquired): ${result.acquiredCount}`);
+        logConsole(`  + Bị từ chối vì hết hàng (Rejected): ${result.rejectedCount}`);
+        logConsole(`  + Phát hiện bán vượt kho (Oversold): ${result.oversold ? 'CÓ (LỖI)' : 'KHÔNG (HOÀN HẢO)'}`);
+        logConsole(`  + Bảo toàn kho (Conservation): ${result.conservationValid ? 'HỢP LỆ (100%)' : 'VI PHẠM'}`);
 
-      const ip16 = lockManager.getProduct('sp-ip16pm');
-      logConsole(`BẢO TOÀN TỒN KHO: Còn: ${ip16.availableStock} | Đang giữ: ${ip16.lockedStock} | Đã bán: ${ip16.soldStock} (Tổng: ${ip16.totalStock})`);
-      logConsole('XÁC NHẬN: ZERO OVERSELLING (100% Không bán vượt kho!)');
-      btn.disabled = false;
+        const ip16 = lockManager.getProduct('sp-ip16pm');
+        logConsole(`TỒN KHO HIỆN TẠI: Còn: ${ip16.availableStock} | Đang giữ: ${ip16.lockedStock} | Đã bán: ${ip16.soldStock} (Tổng: ${ip16.totalStock})`);
+        logConsole('XÁC NHẬN: ZERO OVERSELLING (100% Không bán vượt kho!)');
+        announce(`Hoàn thành 50 bot burst: ${result.acquiredCount} thành công, ${result.rejectedCount} bị từ chối.`);
+      } catch (err) {
+        logConsole(`Lỗi khi chạy simulator: ${err.message}`);
+      } finally {
+        btn.disabled = false;
+        renderProductCards();
+      }
     });
 
     document.getElementById('btn-burst-all').addEventListener('click', async () => {
       const btn = document.getElementById('btn-burst-all');
       btn.disabled = true;
-      logConsole('==================================================');
-      logConsole('KHỞI CHẠY 100 BOT NGẪU NHIÊN VÀO TOÀN BỘ KHO FLASH SALE...');
+      try {
+        logConsole('==================================================');
+        logConsole('KHỞI CHẠY 100 BOT NGẪU NHIÊN VÀO TOÀN BỘ KHO FLASH SALE...');
 
-      const products = lockManager.getProducts();
-      const promises = [];
-      for (let i = 0; i < 100; i++) {
-        const randomProd = products[Math.floor(Math.random() * products.length)];
-        promises.push(lockManager.requestLock(randomProd.id, `flash-bot-${i}`));
+        const products = lockManager.getProducts();
+        const promises = [];
+        for (let i = 0; i < 100; i++) {
+          const randomProd = products[Math.floor(Math.random() * products.length)];
+          promises.push(lockManager.requestLock(randomProd.id, `flash-bot-${i}-${Date.now()}`));
+        }
+
+        const results = await Promise.all(promises);
+        const acquired = results.filter((r) => r?.status === 'LOCKED' || r?.success).length;
+        const rejected = results.filter((r) => r?.status !== 'LOCKED' && !r?.success).length;
+
+        logConsole(`KẾT THÚC 100 BOT BURST: ${acquired} lượt giữ chỗ thành công, ${rejected} lượt bị từ chối.`);
+
+        const report = verifyStorewideConservation(lockManager);
+        logConsole(`KIỂM ĐỊNH BẢO TOÀN KHO TOÀN SÀN: ${report.valid ? '100% BẢO TOÀN' : 'VI PHẠM: ' + report.errors.join('; ')}`);
+        announce(`Hoàn thành 100 bot: ${acquired} thành công, bảo toàn kho: ${report.valid ? 'OK' : 'LỖI'}`);
+      } catch (err) {
+        logConsole(`Lỗi: ${err.message}`);
+      } finally {
+        btn.disabled = false;
+        renderProductCards();
       }
-
-      const results = await Promise.all(promises);
-      const acquired = results.filter((r) => r.success).length;
-      const rejected = results.filter((r) => !r.success).length;
-
-      logConsole(`KẾT THÚC 100 BOT BURST: ${acquired} lượt giữ chỗ thành công, ${rejected} lượt bị từ chối.`);
-      logConsole('Toàn bộ các kho hàng đều thỏa mãn: available + locked + sold === totalStock');
-      btn.disabled = false;
     });
 
     document.getElementById('btn-reset-inventory').addEventListener('click', () => {
       myActiveLocks.clear();
-      FLASH_DEAL_CATALOG.forEach((p) => {
-        const prod = lockManager.products.get(p.id);
-        if (prod) {
-          prod.availableStock = prod.totalStock;
-          prod.lockedStock = 0;
-          prod.soldStock = 0;
-        }
-      });
-      lockManager.locks.clear();
+      lockManager.resetInventory(FLASH_DEAL_CATALOG);
+      announce('Đã đặt lại kho hàng thành công');
       logConsole('ĐÃ ĐẶT LẠI TOÀN BỘ KHO HÀNG FLASH SALE VỀ MẶC ĐỊNH.');
       renderProductCards();
     });

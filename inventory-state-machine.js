@@ -252,6 +252,41 @@ export class OptimisticInventoryLockManager {
   }
 
   /**
+   * Resets the entire store inventory to initial or supplied catalog state.
+   * Invalidates all previous active locks, restores baseline stock,
+   * validates mathematical conservation, and notifies all subscribers.
+   * 
+   * @param {ProductInventory[]} [initialCatalog]
+   */
+  resetInventory(initialCatalog) {
+    // 1. Invalidate and transition all existing active locks
+    for (const lock of this.locks.values()) {
+      if (lock.status === 'LOCKED' || lock.status === 'CHECKING_OUT') {
+        lock.status = 'RELEASED';
+      }
+    }
+    this.locks.clear();
+
+    // 2. Reset or re-populate product inventory baseline
+    const catalog = initialCatalog || Array.from(this.products.values());
+    catalog.forEach((p) => {
+      const total = p.totalStock;
+      const product = {
+        ...p,
+        totalStock: total,
+        availableStock: total,
+        lockedStock: 0,
+        soldStock: 0
+      };
+      this._assertConservation(product);
+      this.products.set(p.id, product);
+    });
+
+    // 3. Notify all subscribers
+    this._notify('INVENTORY_RESET');
+  }
+
+  /**
    * Simulates a concurrent flash crowd burst of N users simultaneously hitting the lock button
    * Verifies mathematically that availableStock + lockedStock + soldStock === totalStock
    * 
@@ -263,8 +298,8 @@ export class OptimisticInventoryLockManager {
     const promises = userIds.map((uid) => this.requestLock(productId, uid));
     const results = await Promise.all(promises);
 
-    const acquired = results.filter((r) => r.success).length;
-    const rejected = results.filter((r) => !r.success).length;
+    const acquired = results.filter((r) => r?.status === 'LOCKED' || r?.success).length;
+    const rejected = results.filter((r) => r?.status !== 'LOCKED' && !r?.success).length;
 
     return {
       totalRequests: userIds.length,

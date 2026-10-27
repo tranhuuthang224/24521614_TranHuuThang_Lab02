@@ -226,3 +226,42 @@ test('Scenario 9: Regular checkout flow transitions locked stock to sold stock',
 
   manager.destroy();
 });
+
+test('Scenario 10: resetInventory restores all products to baseline and invalidates prior locks', async () => {
+  const manager = new OptimisticInventoryLockManager(SAMPLE_PRODUCTS);
+
+  // Lock and checkout some items
+  const lock1 = await manager.requestLock('prod-single', 'buyer-1', 10000);
+  assert.equal(lock1.status, 'LOCKED');
+
+  const lock2 = await manager.requestLock('prod-iphone', 'buyer-2', 10000);
+  assert.equal(lock2.status, 'LOCKED');
+  await manager.confirmCheckout(lock2.lockId);
+
+  // Stock before reset
+  assert.equal(manager.getProduct('prod-single').availableStock, 0);
+  assert.equal(manager.getProduct('prod-iphone').soldStock, 1);
+
+  // Trigger resetInventory
+  let resetNotified = false;
+  manager.subscribe((evt) => {
+    if (evt.type === 'INVENTORY_RESET') resetNotified = true;
+  });
+
+  manager.resetInventory(SAMPLE_PRODUCTS);
+
+  assert.equal(resetNotified, true);
+  assert.equal(manager.getProduct('prod-single').availableStock, 1);
+  assert.equal(manager.getProduct('prod-single').lockedStock, 0);
+  assert.equal(manager.getProduct('prod-single').soldStock, 0);
+
+  assert.equal(manager.getProduct('prod-iphone').availableStock, 3);
+  assert.equal(manager.getProduct('prod-iphone').lockedStock, 0);
+  assert.equal(manager.getProduct('prod-iphone').soldStock, 0);
+
+  const report = verifyStorewideConservation(manager);
+  assert.equal(report.valid, true);
+
+  manager.destroy();
+});
+
