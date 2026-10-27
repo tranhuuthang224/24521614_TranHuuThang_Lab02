@@ -107,21 +107,21 @@ export class OptimisticInventoryLockManager {
   async requestLock(productId, userId, leaseDurationMs = 30000) {
     const product = this.products.get(productId);
     if (!product) {
-      return { success: false, reason: 'PRODUCT_NOT_FOUND' };
+      return { success: false, status: 'PRODUCT_NOT_FOUND', reason: 'PRODUCT_NOT_FOUND' };
     }
 
     // Check existing active lock for this user on this product
     for (const activeLock of this.locks.values()) {
       if (activeLock.productId === productId && activeLock.userId === userId && activeLock.status === 'LOCKED') {
         if (Date.now() < activeLock.expiresAt) {
-          return { success: true, lock: { ...activeLock } };
+          return { success: true, status: 'LOCKED', lockId: activeLock.lockId, lock: { ...activeLock } };
         }
       }
     }
 
     // Atomic Stock Guard
     if (product.availableStock <= 0) {
-      return { success: false, reason: 'OUT_OF_STOCK' };
+      return { success: false, status: 'OUT_OF_STOCK', reason: 'OUT_OF_STOCK' };
     }
 
     // Decrement available, increment locked
@@ -146,7 +146,13 @@ export class OptimisticInventoryLockManager {
     this._assertConservation(product);
     this._notify('LOCK_ACQUIRED', product, lockRecord);
 
-    return { success: true, lock: { ...lockRecord } };
+    return {
+      success: true,
+      status: 'LOCKED',
+      lockId,
+      expiresAt: lockRecord.expiresAt,
+      lock: { ...lockRecord }
+    };
   }
 
   /**
@@ -270,10 +276,13 @@ export class OptimisticInventoryLockManager {
   /**
    * Invariant Guard: Mathematical Conservation Law
    * available + locked + sold === totalStock
+   * Also ensures all stock values are non-negative safe integers.
    */
   _assertConservation(product) {
+    const fields = [product.availableStock, product.lockedStock, product.soldStock, product.totalStock];
+    const allValid = fields.every((v) => Number.isSafeInteger(v) && v >= 0);
     const sum = product.availableStock + product.lockedStock + product.soldStock;
-    if (sum !== product.totalStock) {
+    if (!allValid || sum !== product.totalStock) {
       throw new Error(
         `[INVARIANT VIOLATION] Inventory conservation failed for ${product.id}! Total: ${product.totalStock}, but sum: ${sum} (Available: ${product.availableStock}, Locked: ${product.lockedStock}, Sold: ${product.soldStock})`
       );

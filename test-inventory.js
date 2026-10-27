@@ -1,5 +1,5 @@
 /**
- * Automated Verification Test Suite for Optimistic Inventory Lock FSM
+ * Automated Verification Test Suite for Optimistic Inventory Lock FSM & Concurrency Engine
  * Lab 02 - HW 3: Vietnam Mega-Sale Flash Deal Engine
  */
 
@@ -13,109 +13,216 @@ import {
 } from './concurrency-simulator.js';
 
 const SAMPLE_PRODUCTS = [
+  { id: 'prod-single', title: 'Flash Deal 1K - AirPods Pro', originalPrice: 6000000, flashPrice: 1000, discountPercent: 99, totalStock: 1 },
   { id: 'prod-iphone', title: 'iPhone 16 Pro Max', originalPrice: 35000000, flashPrice: 11111111, discountPercent: 68, totalStock: 3 },
   { id: 'prod-sony', title: 'Sony WH-1000XM5', originalPrice: 8000000, flashPrice: 2990000, discountPercent: 63, totalStock: 5 },
   { id: 'prod-mac', title: 'MacBook Air M3', originalPrice: 33000000, flashPrice: 19990000, discountPercent: 39, totalStock: 2 }
 ];
 
-test('Task 3.2: Optimistic Lock acquisition & inventory conservation', async () => {
+test('Scenario 1: 100 concurrent users burst for single item (stock=1) -> exactly 1 lock granted', async () => {
   const manager = new OptimisticInventoryLockManager(SAMPLE_PRODUCTS);
 
-  const initialIphone = manager.getProduct('prod-iphone');
-  assert.equal(initialIphone.availableStock, 3);
-  assert.equal(initialIphone.lockedStock, 0);
-  assert.equal(initialIphone.soldStock, 0);
+  const burst = await simulateFlashCrowdBurst(manager, 'prod-single', 100, 15);
 
-  // User 1 requests lock
-  const res1 = await manager.requestLock('prod-iphone', 'user-1', 10000);
-  assert.equal(res1.success, true);
-  assert.notEqual(res1.lock, undefined);
-  assert.equal(res1.lock.status, 'LOCKED');
+  assert.equal(burst.totalAttempts, 100);
+  assert.equal(burst.acquiredCount, 1, 'Strict mutual exclusion failed: more than 1 lock granted for stock 1');
+  assert.equal(burst.rejectedCount, 99);
+  assert.equal(burst.oversold, false, 'Oversell detected on single-stock flash deal');
+  assert.equal(burst.conservationValid, true);
 
-  const afterLock1 = manager.getProduct('prod-iphone');
-  assert.equal(afterLock1.availableStock, 2);
-  assert.equal(afterLock1.lockedStock, 1);
-  assert.equal(afterLock1.soldStock, 0);
-
-  // Conservation law invariant check
-  const check = verifyStorewideConservation(manager);
-  assert.equal(check.valid, true);
+  const prod = manager.getProduct('prod-single');
+  assert.equal(prod.availableStock, 0);
+  assert.equal(prod.lockedStock, 1);
+  assert.equal(prod.soldStock, 0);
 
   manager.destroy();
 });
 
-test('Task 3.2: High-concurrency Flash Crowd Burst eliminates Overselling (Race Condition Guard)', async () => {
+test('Scenario 2: 100 concurrent users burst for product with stock=3 -> exactly 3 locks granted', async () => {
   const manager = new OptimisticInventoryLockManager(SAMPLE_PRODUCTS);
 
-  // MacBook Air has totalStock = 2. Simulate 50 concurrent bots attempting to buy it simultaneously!
-  const burst = await simulateFlashCrowdBurst(manager, 'prod-mac', 50, 10);
+  const burst = await simulateFlashCrowdBurst(manager, 'prod-iphone', 100, 15);
 
-  assert.equal(burst.totalAttempts, 50);
-  assert.equal(burst.acquiredCount, 2, 'Oversell detected: More locks were granted than totalStock!');
-  assert.equal(burst.rejectedCount, 48, 'Rejection count incorrect');
-  assert.equal(burst.oversold, false, 'Overselling flag triggered!');
-  assert.equal(burst.conservationValid, true, 'Conservation violated!');
+  assert.equal(burst.totalAttempts, 100);
+  assert.equal(burst.acquiredCount, 3, 'Oversell detected: more than 3 locks granted for stock 3');
+  assert.equal(burst.rejectedCount, 97);
+  assert.equal(burst.oversold, false);
+  assert.equal(burst.conservationValid, true);
 
-  const finalMac = manager.getProduct('prod-mac');
-  assert.equal(finalMac.availableStock, 0);
-  assert.equal(finalMac.lockedStock, 2);
-  assert.equal(finalMac.soldStock, 0);
+  const prod = manager.getProduct('prod-iphone');
+  assert.equal(prod.availableStock, 0);
+  assert.equal(prod.lockedStock, 3);
+  assert.equal(prod.soldStock, 0);
 
   manager.destroy();
 });
 
-test('Task 3.2: Checkout confirmation transitions locked stock to sold stock', async () => {
+test('Scenario 3: Storewide inventory conservation remains strictly valid after heavy concurrent burst', async () => {
   const manager = new OptimisticInventoryLockManager(SAMPLE_PRODUCTS);
 
-  const lockRes = await manager.requestLock('prod-sony', 'user-buyer', 15000);
+  // Burst on multiple products simultaneously
+  await Promise.all([
+    simulateFlashCrowdBurst(manager, 'prod-single', 50, 10),
+    simulateFlashCrowdBurst(manager, 'prod-sony', 60, 10),
+    simulateFlashCrowdBurst(manager, 'prod-mac', 40, 10)
+  ]);
+
+  const report = verifyStorewideConservation(manager);
+  assert.equal(report.valid, true, `Storewide conservation violated: ${report.errors.join(', ')}`);
+  assert.equal(report.errors.length, 0);
+
+  manager.destroy();
+});
+
+test('Scenario 4: Expired lock returned to stock exactly once without inventory leakage', async () => {
+  const manager = new OptimisticInventoryLockManager(SAMPLE_PRODUCTS);
+
+  // Pre-lock 1 unit of prod-sony to ensure test is robust against pre-existing locks
+  const preLock = await manager.requestLock('prod-sony', 'pre-existing-user', 60000);
+  assert.equal(preLock.status, 'LOCKED');
+
+  const sonyBefore = manager.getProduct('prod-sony');
+  assert.equal(sonyBefore.availableStock, 4);
+  assert.equal(sonyBefore.lockedStock, 1);
+
+  // Simulate short 40ms abandonment
+  const sim = await simulateCartAbandonmentAndRecovery(manager, 'prod-sony', 40);
+
+  assert.equal(sim.initialAvailable, 4);
+  assert.equal(sim.restoredAvailable, 4);
+  assert.equal(sim.leaksDetected, false, 'Zombie lock leaked inventory or failed exact recovery');
+
+  // Verify pre-existing lock is still intact and lockedStock returns to 1
+  const sonyAfter = manager.getProduct('prod-sony');
+  assert.equal(sonyAfter.availableStock, 4);
+  assert.equal(sonyAfter.lockedStock, 1);
+  assert.equal(sonyAfter.soldStock, 0);
+
+  manager.destroy();
+});
+
+test('Scenario 5: Releasing same lock twice does not increment stock twice (idempotency guard)', async () => {
+  const manager = new OptimisticInventoryLockManager(SAMPLE_PRODUCTS);
+
+  const lockRes = await manager.requestLock('prod-sony', 'user-double-release', 20000);
+  assert.equal(lockRes.status, 'LOCKED');
+  assert.equal(manager.getProduct('prod-sony').availableStock, 4);
+
+  // First release: succeeds
+  const firstRelease = manager.releaseLock(lockRes.lockId);
+  assert.equal(firstRelease, true);
+  assert.equal(manager.getProduct('prod-sony').availableStock, 5);
+
+  // Second release: must fail safely and not increment stock
+  const secondRelease = manager.releaseLock(lockRes.lockId);
+  assert.equal(secondRelease, false, 'Second release unexpectedly succeeded!');
+  assert.equal(manager.getProduct('prod-sony').availableStock, 5, 'Stock erroneously incremented on duplicate release!');
+
+  manager.destroy();
+});
+
+test('Scenario 6: Checking out same lock twice does not sell twice (double-spend guard)', async () => {
+  const manager = new OptimisticInventoryLockManager(SAMPLE_PRODUCTS);
+
+  const lockRes = await manager.requestLock('prod-mac', 'user-double-checkout', 20000);
+  assert.equal(lockRes.status, 'LOCKED');
+
+  // First checkout: succeeds
+  const firstCheckout = await manager.confirmCheckout(lockRes.lockId);
+  assert.equal(firstCheckout.success, true);
+  assert.ok(firstCheckout.orderId);
+
+  const prodMid = manager.getProduct('prod-mac');
+  assert.equal(prodMid.soldStock, 1);
+  assert.equal(prodMid.lockedStock, 0);
+
+  // Second checkout: must be rejected with invalid state
+  const secondCheckout = await manager.confirmCheckout(lockRes.lockId);
+  assert.equal(secondCheckout.success, false);
+  assert.equal(secondCheckout.reason, 'INVALID_STATE_PURCHASED');
+
+  const prodFinal = manager.getProduct('prod-mac');
+  assert.equal(prodFinal.soldStock, 1, 'Double spend occurred: soldStock incremented twice!');
+  assert.equal(prodFinal.lockedStock, 0);
+
+  manager.destroy();
+});
+
+test('Scenario 7: Non-existent product ID returns clear rejection / error', async () => {
+  const manager = new OptimisticInventoryLockManager(SAMPLE_PRODUCTS);
+
+  const badLock = await manager.requestLock('prod-ghost-nonexistent', 'user-test');
+  assert.equal(badLock.success, false);
+  assert.equal(badLock.status, 'PRODUCT_NOT_FOUND');
+  assert.equal(badLock.reason, 'PRODUCT_NOT_FOUND');
+
+  await assert.rejects(
+    async () => simulateFlashCrowdBurst(manager, 'prod-ghost-nonexistent', 10),
+    /Product prod-ghost-nonexistent not found/
+  );
+
+  await assert.rejects(
+    async () => simulateCartAbandonmentAndRecovery(manager, 'prod-ghost-nonexistent', 50),
+    /Product prod-ghost-nonexistent not found/
+  );
+
+  manager.destroy();
+});
+
+test('Scenario 8: Simulator rejects invalid userCount or maxJitterMs with RangeError', async () => {
+  const manager = new OptimisticInventoryLockManager(SAMPLE_PRODUCTS);
+
+  await assert.rejects(
+    async () => simulateFlashCrowdBurst(manager, 'prod-sony', 0),
+    RangeError
+  );
+
+  await assert.rejects(
+    async () => simulateFlashCrowdBurst(manager, 'prod-sony', -5),
+    RangeError
+  );
+
+  await assert.rejects(
+    async () => simulateFlashCrowdBurst(manager, 'prod-sony', 2.5),
+    RangeError
+  );
+
+  await assert.rejects(
+    async () => simulateFlashCrowdBurst(manager, 'prod-sony', 10, -1),
+    RangeError
+  );
+
+  await assert.rejects(
+    async () => simulateCartAbandonmentAndRecovery(manager, 'prod-sony', 0),
+    RangeError
+  );
+
+  await assert.rejects(
+    async () => simulateCartAbandonmentAndRecovery(manager, 'prod-sony', -50),
+    RangeError
+  );
+
+  manager.destroy();
+});
+
+test('Scenario 9: Regular checkout flow transitions locked stock to sold stock', async () => {
+  const manager = new OptimisticInventoryLockManager(SAMPLE_PRODUCTS);
+
+  const lockRes = await manager.requestLock('prod-sony', 'regular-buyer', 15000);
   assert.equal(lockRes.success, true);
+  assert.equal(lockRes.status, 'LOCKED');
 
-  const checkoutRes = await manager.confirmCheckout(lockRes.lock.lockId);
+  const checkoutRes = await manager.confirmCheckout(lockRes.lockId);
   assert.equal(checkoutRes.success, true);
   assert.ok(checkoutRes.orderId.startsWith('VN1111-'));
 
   const finalSony = manager.getProduct('prod-sony');
-  assert.equal(finalSony.availableStock, 4); // 5 - 1
+  assert.equal(finalSony.availableStock, 4);
   assert.equal(finalSony.lockedStock, 0);
   assert.equal(finalSony.soldStock, 1);
 
-  // Lock status is now PURCHASED
-  const lockRecord = manager.getLock(lockRes.lock.lockId);
+  const lockRecord = manager.getLock(lockRes.lockId);
   assert.equal(lockRecord.status, 'PURCHASED');
-
-  manager.destroy();
-});
-
-test('Task 3.2: TTL Lease Expiry recovers abandoned stock (Anti-Zombie Lock)', async () => {
-  const manager = new OptimisticInventoryLockManager(SAMPLE_PRODUCTS);
-
-  // Short 40ms lease simulation
-  const sim = await simulateCartAbandonmentAndRecovery(manager, 'prod-iphone', 40);
-
-  assert.equal(sim.initialAvailable, 3);
-  assert.equal(sim.lockedCount, 1);
-  assert.equal(sim.restoredAvailable, 3, 'Expired lock was not returned to available pool!');
-  assert.equal(sim.leaksDetected, false, 'Zombie lock leaked inventory!');
-
-  manager.destroy();
-});
-
-test('Task 3.2: Manual user cancellation returns stock immediately', async () => {
-  const manager = new OptimisticInventoryLockManager(SAMPLE_PRODUCTS);
-
-  const lockRes = await manager.requestLock('prod-iphone', 'user-cancel', 20000);
-  assert.equal(lockRes.success, true);
-
-  assert.equal(manager.getProduct('prod-iphone').availableStock, 2);
-
-  // User manually clicks cancel
-  const releaseOk = manager.releaseLock(lockRes.lock.lockId);
-  assert.equal(releaseOk, true);
-
-  // Stock is immediately restored
-  const finalIphone = manager.getProduct('prod-iphone');
-  assert.equal(finalIphone.availableStock, 3);
-  assert.equal(finalIphone.lockedStock, 0);
 
   manager.destroy();
 });
